@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="he">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Broadlink → Raw MQTT Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e1116;
+      --ink: #f2f3f5;
+      --muted: #aab0bb;
+      --accent: #5bd6c2;
+      --accent-2: #ffb454;
+      --card: #161a22;
+      --border: rgba(255, 255, 255, 0.08);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Rubik", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 10% 10%, rgba(91, 214, 194, 0.18), transparent 55%),
+        radial-gradient(900px 600px at 90% 20%, rgba(255, 180, 84, 0.18), transparent 55%),
+        radial-gradient(800px 500px at 50% 90%, rgba(128, 99, 255, 0.2), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 18px 96px;
+    }
+
+    .shell {
+      width: min(920px, 100%);
+      display: grid;
+      gap: 24px;
+    }
+
+    header {
+      display: grid;
+      gap: 12px;
+    }
+
+    .tabs {
+      display: inline-flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-weight: 600;
+      font-family: "Space Grotesk", "Rubik", sans-serif;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab.active {
+      color: #0e1116;
+      background: linear-gradient(135deg, var(--accent), #4f9eff);
+      border-color: transparent;
+      box-shadow: 0 10px 25px rgba(91, 214, 194, 0.25);
+    }
+
+    h1 {
+      font-family: "Space Grotesk", "Rubik", sans-serif;
+      font-size: clamp(2rem, 3vw + 1rem, 3.4rem);
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.02rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 18px;
+    }
+
+    .row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .label {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .upload {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px dashed rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.02);
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+    }
+
+    .upload.is-dragover {
+      border-color: rgba(91, 214, 194, 0.7);
+      background: rgba(91, 214, 194, 0.08);
+      transform: translateY(-1px);
+    }
+
+    input[type="file"] {
+      color: var(--muted);
+      font-family: inherit;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    button,
+    .download {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-weight: 600;
+      font-family: "Space Grotesk", "Rubik", sans-serif;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+    button {
+      background: linear-gradient(135deg, var(--accent), #4f9eff);
+      color: #0e1116;
+      box-shadow: 0 12px 30px rgba(91, 214, 194, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button:hover:not(:disabled),
+    .download:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 35px rgba(79, 158, 255, 0.25);
+    }
+
+    .download {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .status {
+      font-size: 0.95rem;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+
+    .note {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(91, 214, 194, 0.12);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .footer-links {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 16px;
+      z-index: 2;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      text-decoration: none;
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      letter-spacing: 0.02em;
+      transition: all 0.2s ease;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .footer-links a:hover {
+      color: var(--ink);
+      border-color: rgba(91, 214, 194, 0.4);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 640px) {
+      .card {
+        padding: 20px;
+      }
+
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      button,
+      .download {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <span class="pill">Local • No uploads</span>
+      <div class="tabs" role="tablist" aria-label="Conversion modes">
+        <button class="tab active" type="button" data-mode="to-raw" role="tab" aria-selected="true">Broadlink → Raw MQTT</button>
+        <button class="tab" type="button" data-mode="to-broadlink" role="tab" aria-selected="false">Raw MQTT → Broadlink</button>
+      </div>
+      <h1 id="title">Broadlink to Raw MQTT</h1>
+      <p id="subtitle">Upload a Broadlink JSON file, convert it to Raw MQTT, and download the new file. Everything happens locally in your browser.</p>
+      <p class="note">Built for SmartIR: switch IR command payloads between Broadlink base64 and Raw MQTT.</p>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <div class="label">Source file</div>
+        <div class="upload">
+          <input id="fileInput" type="file" accept="application/json,.json" />
+          <div class="note">Drag a JSON file here or choose it manually.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="convertBtn" disabled>Convert!</button>
+        <a id="downloadLink" class="download" href="#" download hidden>Download converted file</a>
+      </div>
+
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+
+  <footer class="footer-links" aria-label="Helpful links">
+    <a href="https://community.home-assistant.io/t/guide-how-to-use-the-zs06-or-ufo-r11-zigbee-ir-controllers-with-smartir/939301?u=tomer11" target="_blank" rel="noreferrer">Zigbee SmartIR guide</a>
+    <a href="https://github.com/smartHomeHub/SmartIR/tree/e4df2957ad915536f41ffb39daa96886d7cfe040/codes" target="_blank" rel="noreferrer">Broadlink code repository</a>
+  </footer>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const convertBtn = document.getElementById("convertBtn");
+    const downloadLink = document.getElementById("downloadLink");
+    const statusEl = document.getElementById("status");
+    const uploadBox = document.querySelector(".upload");
+    const titleEl = document.getElementById("title");
+    const subtitleEl = document.getElementById("subtitle");
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+
+    const BRDLNK_UNIT = 269 / 8192;
+    const BROADLINK_TAIL_TICKS = 0x0d05;
+    const BROADLINK_PADDING_BYTES = 14;
+
+    function setStatus(message) {
+      statusEl.textContent = message || "";
+    }
+
+    function base64ToBytes(base64) {
+      const clean = base64.replace(/\s+/g, "");
+      const binary = atob(clean);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    }
+
+    function emitLiteralBlock(out, data) {
+      const length = data.length - 1;
+      out.push(length & 0xff);
+      for (let i = 0; i < data.length; i += 1) {
+        out.push(data[i]);
+      }
+    }
+
+    function emitLiteralBlocks(out, data) {
+      for (let i = 0; i < data.length; i += 32) {
+        emitLiteralBlock(out, data.subarray(i, i + 32));
+      }
+    }
+
+    function emitDistanceBlock(out, length, distance) {
+      let dist = distance - 1;
+      let len = length - 2;
+      if (len <= 0) return;
+      const block = [];
+      if (len >= 7) {
+        block.push(len - 7);
+        len = 7;
+      }
+      block.unshift((len << 5) | (dist >> 8));
+      block.push(dist & 0xff);
+      for (const byte of block) {
+        out.push(byte & 0xff);
+      }
+    }
+
+    function compress(data, level = 2) {
+      const out = [];
+      if (level === 0) {
+        emitLiteralBlocks(out, data);
+        return new Uint8Array(out);
+      }
+
+      const W = 2 ** 13;
+      const L = 255 + 9;
+      let suffixes = [];
+      let nextPos = 0;
+      let lastIdx = 0;
+
+      const suffixCompare = (a, b) => {
+        const max = data.length;
+        let i = 0;
+        while (a + i < max && b + i < max) {
+          const diff = data[a + i] - data[b + i];
+          if (diff !== 0) return diff;
+          i += 1;
+        }
+        return (max - a) - (max - b);
+      };
+
+      const findIdx = (n) => {
+        let lo = 0;
+        let hi = suffixes.length;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (suffixCompare(suffixes[mid], n) < 0) {
+            lo = mid + 1;
+          } else {
+            hi = mid;
+          }
+        }
+        return lo;
+      };
+
+      const distanceCandidates = (pos) => {
+        while (nextPos <= pos) {
+          if (suffixes.length === W) {
+            const removeIdx = findIdx(nextPos - W);
+            suffixes.splice(removeIdx, 1);
+          }
+          const idx = findIdx(nextPos);
+          suffixes.splice(idx, 0, nextPos);
+          lastIdx = idx;
+          nextPos += 1;
+        }
+        const idxs = [lastIdx + 1, lastIdx - 1];
+        const candidates = [];
+        for (const idx of idxs) {
+          if (idx >= 0 && idx < suffixes.length) {
+            candidates.push(pos - suffixes[idx]);
+          }
+        }
+        return candidates;
+      };
+
+      const findLengthForDistance = (pos, start) => {
+        let length = 0;
+        const limit = Math.min(L, data.length - pos);
+        while (length < limit && data[pos + length] === data[start + length]) {
+          length += 1;
+        }
+        return length;
+      };
+
+      const findLengthMax = (pos) => {
+        let bestLen = 0;
+        let bestDist = 0;
+        const distances = level >= 2 ? distanceCandidates(pos) : null;
+        const distList = distances || Array.from({ length: Math.min(pos, W) }, (_, i) => i + 1);
+        for (const d of distList) {
+          const len = findLengthForDistance(pos, pos - d);
+          if (len > bestLen || (len === bestLen && d < bestDist)) {
+            bestLen = len;
+            bestDist = d;
+          }
+        }
+        return bestLen >= 3 ? { length: bestLen, distance: bestDist } : null;
+      };
+
+      let blockStart = 0;
+      let pos = 0;
+      while (pos < data.length) {
+        const candidate = findLengthMax(pos);
+        if (candidate) {
+          emitLiteralBlocks(out, data.subarray(blockStart, pos));
+          emitDistanceBlock(out, candidate.length, candidate.distance);
+          pos += candidate.length;
+          blockStart = pos;
+        } else {
+          pos += 1;
+        }
+      }
+      emitLiteralBlocks(out, data.subarray(blockStart, pos));
+      return new Uint8Array(out);
+    }
+
+    function decompress(data) {
+      const out = [];
+      let i = 0;
+      while (i < data.length) {
+        const header = data[i++];
+        if (header < 32) {
+          const length = header + 1;
+          for (let j = 0; j < length; j += 1) {
+            out.push(data[i + j]);
+          }
+          i += length;
+        } else {
+          let len = header >> 5;
+          const distHigh = header & 0x1f;
+          if (len === 7) {
+            len += data[i++];
+          }
+          let dist = (distHigh << 8) | data[i++];
+          dist += 1;
+          const length = len + 2;
+          for (let j = 0; j < length; j += 1) {
+            out.push(out[out.length - dist]);
+          }
+        }
+      }
+      return new Uint8Array(out);
+    }
+
+    function getRawFromBroadlink(hexString) {
+      const dec = [];
+      const length = parseInt(hexString.slice(6, 8) + hexString.slice(4, 6), 16);
+      let i = 8;
+      while (i < length * 2 + 8) {
+        let hexValue = hexString.slice(i, i + 2);
+        if (hexValue === "00") {
+          hexValue = hexString.slice(i + 2, i + 4) + hexString.slice(i + 4, i + 6);
+          i += 4;
+        }
+        dec.push(Math.ceil(parseInt(hexValue, 16) / BRDLNK_UNIT));
+        i += 2;
+      }
+      return dec;
+    }
+
+    function buildBroadlinkPacket(rawValues) {
+      const payload = [];
+      for (const value of rawValues) {
+        const ticks = Math.max(1, Math.round(value * BRDLNK_UNIT));
+        if (ticks < 0x100) {
+          payload.push(ticks);
+        } else {
+          payload.push(0x00, (ticks >> 8) & 0xff, ticks & 0xff);
+        }
+      }
+
+      // Append the standard Broadlink tail gap (0x0d05) and padding used by SmartIR files.
+      payload.push(0x00, (BROADLINK_TAIL_TICKS >> 8) & 0xff, BROADLINK_TAIL_TICKS & 0xff);
+
+      const length = payload.length;
+      const header = [0x26, 0x00, length & 0xff, (length >> 8) & 0xff];
+      const packet = new Uint8Array(header.length + payload.length + BROADLINK_PADDING_BYTES);
+      packet.set(header, 0);
+      packet.set(payload, header.length);
+      packet.set(new Array(BROADLINK_PADDING_BYTES).fill(0x00), header.length + payload.length);
+      return packet;
+    }
+
+    function encodeIr(command) {
+      const bytes = base64ToBytes(command);
+      let hex = "";
+      for (let i = 0; i < bytes.length; i += 1) {
+        hex += bytes[i].toString(16).padStart(2, "0");
+      }
+      const signal = getRawFromBroadlink(hex).filter((value) => value < 65535);
+      const payload = new Uint8Array(signal.length * 2);
+      for (let i = 0; i < signal.length; i += 1) {
+        const value = signal[i];
+        payload[i * 2] = value & 0xff;
+        payload[i * 2 + 1] = (value >> 8) & 0xff;
+      }
+      const compressed = compress(payload, 2);
+      return bytesToBase64(compressed);
+    }
+
+    function decodeIr(command) {
+      const compressed = base64ToBytes(command);
+      const decompressed = decompress(compressed);
+      const rawValues = [];
+      for (let i = 0; i < decompressed.length; i += 2) {
+        rawValues.push(decompressed[i] | (decompressed[i + 1] << 8));
+      }
+      const broadlinkPacket = buildBroadlinkPacket(rawValues);
+      return bytesToBase64(broadlinkPacket);
+    }
+
+    function processCommandsToRaw(data) {
+      const walk = (commands) => {
+        const processed = Array.isArray(commands) ? [] : {};
+        for (const key in commands) {
+          if (!Object.prototype.hasOwnProperty.call(commands, key)) continue;
+          const value = commands[key];
+          if (typeof value === "string") {
+            processed[key] = encodeIr(value);
+          } else if (value && typeof value === "object") {
+            processed[key] = walk(value);
+          } else {
+            processed[key] = value;
+          }
+        }
+        return processed;
+      };
+
+      const output = { ...data };
+      output.commands = walk(data.commands || {});
+      output.supportedController = "MQTT";
+      output.commandsEncoding = "Raw";
+      return output;
+    }
+
+    function processCommandsToBroadlink(data) {
+      const walk = (commands) => {
+        const processed = Array.isArray(commands) ? [] : {};
+        for (const key in commands) {
+          if (!Object.prototype.hasOwnProperty.call(commands, key)) continue;
+          const value = commands[key];
+          if (typeof value === "string") {
+            processed[key] = decodeIr(value);
+          } else if (value && typeof value === "object") {
+            processed[key] = walk(value);
+          } else {
+            processed[key] = value;
+          }
+        }
+        return processed;
+      };
+
+      const output = { ...data };
+      output.commands = walk(data.commands || {});
+      output.supportedController = "Broadlink";
+      output.commandsEncoding = "Base64";
+      return output;
+    }
+
+    const MODE_COPY = {
+      "to-raw": {
+        title: "Broadlink to Raw MQTT",
+        subtitle: "Upload a Broadlink JSON file, convert it to Raw MQTT, and download the new file. Everything happens locally in your browser.",
+        button: "Convert!",
+        suffix: ".json",
+      },
+      "to-broadlink": {
+        title: "Raw MQTT to Broadlink",
+        subtitle: "Upload a Raw MQTT JSON file, convert it back to Broadlink, and download the new file. Everything stays in your browser.",
+        button: "Convert!",
+        suffix: ".json",
+      },
+    };
+
+    let currentMode = "to-raw";
+
+    function setMode(mode) {
+      currentMode = mode;
+      const copy = MODE_COPY[mode];
+      titleEl.textContent = copy.title;
+      subtitleEl.textContent = copy.subtitle;
+      convertBtn.textContent = copy.button;
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.mode === mode;
+        tab.classList.toggle("active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+      });
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+    }
+
+    function setSelectedFile(file) {
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      convertBtn.disabled = false;
+    }
+
+    fileInput.addEventListener("change", () => {
+      convertBtn.disabled = !fileInput.files.length;
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      uploadBox.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        uploadBox.classList.add("is-dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      uploadBox.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        uploadBox.classList.remove("is-dragover");
+      });
+    });
+
+    uploadBox.addEventListener("drop", (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+      setSelectedFile(file);
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+    });
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        if (tab.dataset.mode) {
+          setMode(tab.dataset.mode);
+        }
+      });
+    });
+
+    convertBtn.addEventListener("click", async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      convertBtn.disabled = true;
+      setStatus("Converting the file...");
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const processed =
+          currentMode === "to-raw"
+            ? processCommandsToRaw(data)
+            : processCommandsToBroadlink(data);
+        const outputText = JSON.stringify(processed, null, 2);
+        const blob = new Blob([outputText], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const baseName = file.name.replace(/\.json$/i, "") || "converted";
+        const suffix = MODE_COPY[currentMode].suffix;
+        downloadLink.href = url;
+        downloadLink.download = `${baseName}${suffix}`;
+        downloadLink.hidden = false;
+        setStatus("Your file is ready to download.");
+      } catch (error) {
+        console.error(error);
+        setStatus("The file could not be read or is invalid. Make sure it's a JSON file.");
+      } finally {
+        convertBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
