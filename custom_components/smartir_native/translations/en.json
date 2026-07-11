@@ -1,0 +1,56 @@
+{
+  "title": "SmartIR Native",
+  "config": {
+    "flow_title": "Add a SmartIR climate",
+    "step": {
+      "user": {
+        "title": "Paste the profile code",
+        "description": "Create and copy a profile code from the SmartIR converter website, then paste it below.",
+        "data": {
+          "profile_code": "Profile code"
+        },
+        "data_description": {
+          "profile_code": "A code beginning with IRP1: generated locally by the converter website."
+        }
+      },
+      "device": {
+        "title": "Set up the climate entity",
+        "description": "Choose the Infrared emitter that controls this device. Optionally choose a receiver to keep the entity synchronized when the physical remote is used.",
+        "data": {
+          "name": "Name",
+          "infrared_entity_id": "Infrared emitter",
+          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+        }
+      },
+      "reconfigure": {
+        "title": "Update SmartIR Native device",
+        "description": "Change the name, emitter, or optional receiver. Removing the receiver keeps normal transmit-only operation.",
+        "data": {
+          "name": "Name",
+          "infrared_entity_id": "Infrared emitter",
+          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_profile": "The profile code is invalid or unsupported. Generate it again and paste the complete code."
+    },
+    "abort": {
+      "no_infrared_emitters": "No Home Assistant Infrared emitter entity is available.",
+      "invalid_profile": "The profile setup session expired. Start adding the integration again.",
+      "reconfigure_successful": "The SmartIR Native device was updated successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit Infrared entities",
+        "description": "Change the emitter or optional receiver used by this climate entity. Leave the receiver empty for transmit-only operation.",
+        "data": {
+          "infrared_entity_id": "Infrared emitter",
+          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+        }
+      }
+    }
+  }
+}

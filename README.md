@@ -1,6 +1,33 @@
-# SmartIR Broadlink ↔ Raw MQTT Converter
+# SmartIR and Home Assistant IR Converter
 
-A tiny, browser-only tool for converting IR command payloads for SmartIR between Broadlink Base64 and Raw MQTT formats. No uploads, no Python, everything runs locally.
+A tiny, browser-only tool for converting IR command payloads for SmartIR and Home Assistant native Infrared.
+
+It supports:
+- Broadlink Base64 to Raw MQTT
+- Raw MQTT to Broadlink Base64
+- Broadlink Base64 to Home Assistant signed raw timings
+- Raw MQTT to Home Assistant signed raw timings
+- Home Assistant signed raw timings to Raw MQTT
+- Home Assistant signed raw timings to Broadlink Base64
+
+No uploads, no Python, everything runs locally.
+
+The converter can process a full SmartIR JSON file or a single pasted IR code.
+
+It can also turn a SmartIR climate JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Each profile creates a native Climate entity and sends commands through a Home Assistant Infrared emitter entity, following the same consumer/emitter architecture used by integrations such as LG Infrared.
+
+## SmartIR Native installation
+
+SmartIR Native requires Home Assistant 2026.6 or newer.
+
+1. In HACS, add this repository as a custom Integration repository, or use the **Install with HACS** button on the website.
+2. Download SmartIR Native in HACS and restart Home Assistant.
+3. On the website, open **Native HA integration**, upload a SmartIR climate JSON file, and create a profile code.
+4. Copy the profile code and select **Add to Home Assistant**.
+5. Paste the code, choose the Infrared emitter, and name the climate entity.
+6. Optionally choose an Infrared receiver. When a known command is received from the physical remote, the entity updates its HVAC mode, target temperature, fan mode, and swing mode.
+
+Install the integration only once. Repeat steps 3-6 for every additional climate device. A receiver is not required; without one, the entity continues to work in transmit-only assumed-state mode. Use the integration's **Configure** button to change the emitter, add or replace a receiver, or remove the receiver later. The **Reconfigure** menu can also edit these fields together with the device name. Profile creation remains entirely local in the browser.
 
 [Try it!](https://tomer2526.github.io/Convert-Broadlink-Codes-to-Row-MQTT-Format/)
 
@@ -9,3 +36,8 @@ A tiny, browser-only tool for converting IR command payloads for SmartIR between
 
 ## SmartIR Project
 - [SmartIR GitHub repository](https://github.com/smartHomeHub/SmartIR/tree/master?tab=readme-ov-file)
+
+## Home Assistant Infrared
+- [Home Assistant infrared entity documentation](https://developers.home-assistant.io/docs/core/entity/infrared/)
+- [Home Assistant LG Infrared integration](https://www.home-assistant.io/integrations/lg_infrared/)
+- [Zigbee IR bridge for native Home Assistant infrared](https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster/tree/main/custom_components/z2m_ir_bridge)

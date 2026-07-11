@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Broadlink → Raw MQTT Converter</title>
+  <title>SmartIR & HA IR Converter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -50,13 +50,13 @@
       gap: 12px;
     }
 
-    .tabs {
+    .mode-tabs {
       display: inline-flex;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    .tab {
+    .mode-tab {
       border-radius: 999px;
       padding: 8px 16px;
       font-weight: 600;
@@ -68,11 +68,66 @@
       transition: all 0.2s ease;
     }
 
-    .tab.active {
+    .mode-tab.active {
       color: #0e1116;
       background: linear-gradient(135deg, var(--accent), #4f9eff);
       border-color: transparent;
       box-shadow: 0 10px 25px rgba(91, 214, 194, 0.25);
+    }
+
+    .format-picker {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: end;
+      gap: 12px;
+      width: min(720px, 100%);
+    }
+
+    .integration-format-picker {
+      width: min(520px, 100%);
+    }
+
+    .format-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .format-field span {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    select {
+      width: 100%;
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 12px 42px 12px 14px;
+      font: 600 1rem "Space Grotesk", "Rubik", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(45deg, transparent 50%, var(--accent) 50%) calc(100% - 20px) 50% / 7px 7px no-repeat,
+        linear-gradient(135deg, var(--accent) 50%, transparent 50%) calc(100% - 15px) 50% / 7px 7px no-repeat,
+        rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: 2px solid rgba(91, 214, 194, 0.4);
+      outline-offset: 2px;
+    }
+
+    .format-arrow {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      color: #0e1116;
+      background: linear-gradient(135deg, var(--accent), #4f9eff);
+      font-weight: 700;
     }
 
     h1 {
@@ -111,6 +166,13 @@
       color: var(--muted);
     }
 
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
     .upload {
       display: grid;
       gap: 14px;
@@ -130,6 +192,28 @@
     input[type="file"] {
       color: var(--muted);
       font-family: inherit;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      resize: vertical;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 14px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.03);
+      font: 500 0.95rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      line-height: 1.5;
+    }
+
+    textarea:focus {
+      outline: 2px solid rgba(91, 214, 194, 0.4);
+      outline-offset: 2px;
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .actions {
@@ -175,6 +259,19 @@
       text-decoration: none;
     }
 
+    .copy-button {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      box-shadow: none;
+      padding: 7px 12px;
+      font-size: 0.82rem;
+    }
+
+    .copy-button:hover:not(:disabled) {
+      box-shadow: none;
+    }
+
     .status {
       font-size: 0.95rem;
       color: var(--muted);
@@ -184,6 +281,19 @@
     .note {
       font-size: 0.9rem;
       color: var(--muted);
+    }
+
+    .integration-details {
+      display: grid;
+      gap: 8px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--accent-2);
+      border-radius: 0 14px 14px 0;
+      background: rgba(255, 180, 84, 0.07);
+    }
+
+    .integration-details strong {
+      font-family: "Space Grotesk", "Rubik", sans-serif;
     }
 
     .pill {
@@ -245,6 +355,14 @@
         width: 100%;
         text-align: center;
       }
+
+      .format-picker {
+        grid-template-columns: 1fr;
+      }
+
+      .format-arrow {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -252,21 +370,97 @@
   <main class="shell">
     <header>
       <span class="pill">Local • No uploads</span>
-      <div class="tabs" role="tablist" aria-label="Conversion modes">
-        <button class="tab active" type="button" data-mode="to-raw" role="tab" aria-selected="true">Broadlink → Raw MQTT</button>
-        <button class="tab" type="button" data-mode="to-broadlink" role="tab" aria-selected="false">Raw MQTT → Broadlink</button>
+      <div class="mode-tabs" role="tablist" aria-label="Input mode">
+        <button class="mode-tab active" type="button" data-input-mode="json" role="tab" aria-selected="true">SmartIR JSON file</button>
+        <button class="mode-tab" type="button" data-input-mode="single" role="tab" aria-selected="false">Single code</button>
+        <button class="mode-tab" type="button" data-input-mode="integration" role="tab" aria-selected="false">Native HA integration</button>
+      </div>
+      <div id="formatPicker" class="format-picker" aria-label="Conversion formats">
+        <label class="format-field" for="sourceFormat">
+          <span>Source format</span>
+          <select id="sourceFormat">
+            <option value="broadlink" selected>Broadlink</option>
+            <option value="raw">Raw MQTT</option>
+            <option value="ha">HA IR</option>
+          </select>
+        </label>
+        <div class="format-arrow" aria-hidden="true">→</div>
+        <label class="format-field" for="targetFormat">
+          <span>Target format</span>
+          <select id="targetFormat">
+            <option value="broadlink">Broadlink</option>
+            <option value="raw" selected>Raw MQTT</option>
+            <option value="ha">HA IR</option>
+          </select>
+        </label>
+      </div>
+      <div id="integrationFormatPicker" class="integration-format-picker" hidden>
+        <label class="format-field" for="integrationSourceFormat">
+          <span>Codes in the SmartIR file</span>
+          <select id="integrationSourceFormat">
+            <option value="auto" selected>Auto-detect</option>
+            <option value="broadlink">Broadlink</option>
+            <option value="raw">Raw MQTT</option>
+            <option value="ha">HA IR</option>
+          </select>
+        </label>
       </div>
       <h1 id="title">Broadlink to Raw MQTT</h1>
       <p id="subtitle">Upload a Broadlink JSON file, convert it to Raw MQTT, and download the new file. Everything happens locally in your browser.</p>
-      <p class="note">Built for SmartIR: switch IR command payloads between Broadlink base64 and Raw MQTT.</p>
+      <p class="note">Built for SmartIR and Home Assistant native Infrared: switch IR command payloads between Broadlink base64, Raw MQTT, and signed raw timings.</p>
     </header>
 
     <section class="card">
-      <div class="row">
-        <div class="label">Source file</div>
-        <div class="upload">
-          <input id="fileInput" type="file" accept="application/json,.json" />
-          <div class="note">Drag a JSON file here or choose it manually.</div>
+      <div id="jsonPanel" class="input-panel">
+        <div class="row">
+          <div class="label">Source file</div>
+          <div class="upload">
+            <input id="fileInput" type="file" accept="application/json,.json" />
+            <div class="note">Drag a JSON file here or choose it manually.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="singlePanel" class="input-panel" hidden>
+        <div class="row">
+          <div class="label">Source code</div>
+          <textarea id="singleInput" spellcheck="false" placeholder="Paste one IR code here"></textarea>
+          <div id="singleInputNote" class="note"></div>
+        </div>
+        <div id="singleOutputRow" class="row" hidden>
+          <div class="label-row">
+            <div class="label">Converted code</div>
+            <button id="copyOutputBtn" class="copy-button" type="button">Copy</button>
+          </div>
+          <textarea id="singleOutput" spellcheck="false" readonly></textarea>
+        </div>
+      </div>
+
+      <div id="integrationPanel" class="input-panel" hidden>
+        <div class="row">
+          <div class="label">SmartIR climate file</div>
+          <div id="integrationUpload" class="upload">
+            <input id="integrationFileInput" type="file" accept="application/json,.json" />
+            <div class="note">Drag a SmartIR climate JSON file here or choose it manually.</div>
+          </div>
+        </div>
+        <div class="integration-details">
+          <strong>Install once, add as many climates as you need</strong>
+          <div class="note">Install SmartIR Native once through HACS. Every profile code can become a separate Climate entity, with an optional Infrared receiver that tracks commands sent from the physical remote.</div>
+          <div class="actions">
+            <a class="download" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=tomer2526&amp;repository=Convert-Broadlink-Codes-to-Row-MQTT-Format&amp;category=integration" target="_blank" rel="noreferrer">Install with HACS</a>
+          </div>
+        </div>
+        <div id="integrationOutputRow" class="row" hidden>
+          <div class="label-row">
+            <div class="label">Profile code</div>
+            <button id="copyProfileBtn" class="copy-button" type="button">Copy</button>
+          </div>
+          <textarea id="integrationOutput" spellcheck="false" readonly></textarea>
+          <div class="note">The Add to Home Assistant button also copies the profile code when clipboard access is available. Paste it in the setup flow and choose your Infrared emitter.</div>
+          <div class="actions">
+            <a id="addToHaLink" class="download" href="https://my.home-assistant.io/redirect/config_flow_start/?domain=smartir_native" target="_blank" rel="noreferrer">Add to Home Assistant</a>
+          </div>
         </div>
       </div>
 
@@ -282,6 +476,9 @@
   <footer class="footer-links" aria-label="Helpful links">
     <a href="https://community.home-assistant.io/t/guide-how-to-use-the-zs06-or-ufo-r11-zigbee-ir-controllers-with-smartir/939301?u=tomer11" target="_blank" rel="noreferrer">Zigbee SmartIR guide</a>
     <a href="https://github.com/smartHomeHub/SmartIR/tree/e4df2957ad915536f41ffb39daa96886d7cfe040/codes" target="_blank" rel="noreferrer">Broadlink code repository</a>
+    <a href="https://developers.home-assistant.io/docs/core/entity/infrared/" target="_blank" rel="noreferrer">HA infrared docs</a>
+    <a href="https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster/tree/main/custom_components/z2m_ir_bridge" target="_blank" rel="noreferrer">Z2M IR bridge</a>
+    <a href="https://www.home-assistant.io/integrations/lg_infrared/" target="_blank" rel="noreferrer">LG Infrared example</a>
   </footer>
 
   <script>
@@ -292,11 +489,31 @@
     const uploadBox = document.querySelector(".upload");
     const titleEl = document.getElementById("title");
     const subtitleEl = document.getElementById("subtitle");
-    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const sourceFormatEl = document.getElementById("sourceFormat");
+    const targetFormatEl = document.getElementById("targetFormat");
+    const formatPicker = document.getElementById("formatPicker");
+    const integrationFormatPicker = document.getElementById("integrationFormatPicker");
+    const integrationSourceFormat = document.getElementById("integrationSourceFormat");
+    const modeTabs = Array.from(document.querySelectorAll(".mode-tab"));
+    const jsonPanel = document.getElementById("jsonPanel");
+    const singlePanel = document.getElementById("singlePanel");
+    const integrationPanel = document.getElementById("integrationPanel");
+    const integrationFileInput = document.getElementById("integrationFileInput");
+    const integrationUpload = document.getElementById("integrationUpload");
+    const integrationOutputRow = document.getElementById("integrationOutputRow");
+    const integrationOutput = document.getElementById("integrationOutput");
+    const copyProfileBtn = document.getElementById("copyProfileBtn");
+    const addToHaLink = document.getElementById("addToHaLink");
+    const singleInput = document.getElementById("singleInput");
+    const singleInputNote = document.getElementById("singleInputNote");
+    const singleOutput = document.getElementById("singleOutput");
+    const singleOutputRow = document.getElementById("singleOutputRow");
+    const copyOutputBtn = document.getElementById("copyOutputBtn");
 
     const BRDLNK_UNIT = 269 / 8192;
     const BROADLINK_TAIL_TICKS = 0x0d05;
     const BROADLINK_PADDING_BYTES = 14;
+    const BROADLINK_TAIL_MICROS = Math.ceil(BROADLINK_TAIL_TICKS / BRDLNK_UNIT);
 
     function setStatus(message) {
       statusEl.textContent = message || "";
@@ -495,7 +712,7 @@
       return dec;
     }
 
-    function buildBroadlinkPacket(rawValues) {
+    function buildBroadlinkPacket(rawValues, appendTail = true) {
       const payload = [];
       for (const value of rawValues) {
         const ticks = Math.max(1, Math.round(value * BRDLNK_UNIT));
@@ -507,7 +724,9 @@
       }
 
       // Append the standard Broadlink tail gap (0x0d05) and padding used by SmartIR files.
-      payload.push(0x00, (BROADLINK_TAIL_TICKS >> 8) & 0xff, BROADLINK_TAIL_TICKS & 0xff);
+      if (appendTail) {
+        payload.push(0x00, (BROADLINK_TAIL_TICKS >> 8) & 0xff, BROADLINK_TAIL_TICKS & 0xff);
+      }
 
       const length = payload.length;
       const header = [0x26, 0x00, length & 0xff, (length >> 8) & 0xff];
@@ -535,96 +754,427 @@
       return bytesToBase64(compressed);
     }
 
-    function decodeIr(command) {
+    function getTimingsFromRawMqtt(command) {
       const compressed = base64ToBytes(command);
       const decompressed = decompress(compressed);
       const rawValues = [];
       for (let i = 0; i < decompressed.length; i += 2) {
         rawValues.push(decompressed[i] | (decompressed[i + 1] << 8));
       }
+      return rawValues;
+    }
+
+    function getTimingsFromBroadlink(command) {
+      const bytes = base64ToBytes(command);
+      let hex = "";
+      for (let i = 0; i < bytes.length; i += 1) {
+        hex += bytes[i].toString(16).padStart(2, "0");
+      }
+      return getRawFromBroadlink(hex);
+    }
+
+    function toHomeAssistantTimings(timings) {
+      return timings.map((timing, index) => {
+        const value = Math.abs(Math.round(timing));
+        return index % 2 === 0 ? value : -value;
+      });
+    }
+
+    function isTimingArray(value) {
+      return Array.isArray(value) && value.length > 0 && value.every((item) => {
+        if (typeof item === "number") return Number.isFinite(item);
+        return Array.isArray(item) && item.every((nested) => typeof nested === "number" && Number.isFinite(nested));
+      });
+    }
+
+    function getTimingsFromHomeAssistant(command) {
+      if (!isTimingArray(command)) {
+        throw new Error("Expected a Home Assistant IR timing array.");
+      }
+      const timings = [];
+      for (const timing of command) {
+        if (Array.isArray(timing)) {
+          timings.push(...timing.map((value) => Math.abs(Math.round(value))));
+        } else {
+          timings.push(Math.abs(Math.round(timing)));
+        }
+      }
+      return timings;
+    }
+
+    function encodeTimingsAsRawMqtt(timings) {
+      const signal = timings.filter((value) => value < 65535);
+      const payload = new Uint8Array(signal.length * 2);
+      for (let i = 0; i < signal.length; i += 1) {
+        const value = signal[i];
+        payload[i * 2] = value & 0xff;
+        payload[i * 2 + 1] = (value >> 8) & 0xff;
+      }
+      const compressed = compress(payload, 2);
+      return bytesToBase64(compressed);
+    }
+
+    function hasBroadlinkTailGap(timings) {
+      if (!timings.length) return false;
+      const lastTiming = timings[timings.length - 1];
+      const lastTicks = Math.round(lastTiming * BRDLNK_UNIT);
+      return lastTiming >= 65535 || lastTicks === BROADLINK_TAIL_TICKS || Math.abs(lastTiming - BROADLINK_TAIL_MICROS) <= 2;
+    }
+
+    function decodeIr(command) {
+      const rawValues = getTimingsFromRawMqtt(command);
       const broadlinkPacket = buildBroadlinkPacket(rawValues);
       return bytesToBase64(broadlinkPacket);
     }
 
-    function processCommandsToRaw(data) {
-      const walk = (commands) => {
-        const processed = Array.isArray(commands) ? [] : {};
-        for (const key in commands) {
-          if (!Object.prototype.hasOwnProperty.call(commands, key)) continue;
-          const value = commands[key];
-          if (typeof value === "string") {
-            processed[key] = encodeIr(value);
-          } else if (value && typeof value === "object") {
-            processed[key] = walk(value);
-          } else {
-            processed[key] = value;
-          }
+    function encodeBroadlinkAsHomeAssistant(command) {
+      return toHomeAssistantTimings(getTimingsFromBroadlink(command));
+    }
+
+    function encodeRawAsHomeAssistant(command) {
+      return toHomeAssistantTimings(getTimingsFromRawMqtt(command));
+    }
+
+    function encodeHomeAssistantAsRaw(command) {
+      return encodeTimingsAsRawMqtt(getTimingsFromHomeAssistant(command));
+    }
+
+    function encodeHomeAssistantAsBroadlink(command) {
+      const timings = getTimingsFromHomeAssistant(command);
+      const broadlinkPacket = buildBroadlinkPacket(timings, !hasBroadlinkTailGap(timings));
+      return bytesToBase64(broadlinkPacket);
+    }
+
+    function processCommands(data, transformCommand, meta, shouldTransform = (value) => typeof value === "string") {
+      const walk = (node) => {
+        if (shouldTransform(node)) {
+          return transformCommand(node);
         }
-        return processed;
+        if (Array.isArray(node)) {
+          return node.map((value) => walk(value));
+        }
+        if (node && typeof node === "object") {
+          const processed = {};
+          for (const key in node) {
+            if (!Object.prototype.hasOwnProperty.call(node, key)) continue;
+            processed[key] = walk(node[key]);
+          }
+          return processed;
+        }
+        return node;
       };
 
       const output = { ...data };
       output.commands = walk(data.commands || {});
-      output.supportedController = "MQTT";
-      output.commandsEncoding = "Raw";
-      return output;
+      return { ...output, ...meta };
+    }
+
+    function processCommandsToRaw(data) {
+      return processCommands(data, encodeIr, {
+        supportedController: "MQTT",
+        commandsEncoding: "Raw",
+      });
     }
 
     function processCommandsToBroadlink(data) {
-      const walk = (commands) => {
-        const processed = Array.isArray(commands) ? [] : {};
-        for (const key in commands) {
-          if (!Object.prototype.hasOwnProperty.call(commands, key)) continue;
-          const value = commands[key];
-          if (typeof value === "string") {
-            processed[key] = decodeIr(value);
-          } else if (value && typeof value === "object") {
-            processed[key] = walk(value);
-          } else {
-            processed[key] = value;
-          }
-        }
-        return processed;
-      };
+      return processCommands(data, decodeIr, {
+        supportedController: "Broadlink",
+        commandsEncoding: "Base64",
+      });
+    }
 
-      const output = { ...data };
-      output.commands = walk(data.commands || {});
-      output.supportedController = "Broadlink";
-      output.commandsEncoding = "Base64";
-      return output;
+    function processBroadlinkCommandsToHaIr(data) {
+      return processCommands(data, encodeBroadlinkAsHomeAssistant, {
+        supportedController: "Home Assistant Native Infrared",
+        commandsEncoding: "SignedRawTimings",
+        commandsUnit: "microseconds",
+      });
+    }
+
+    function processRawCommandsToHaIr(data) {
+      return processCommands(data, encodeRawAsHomeAssistant, {
+        supportedController: "Home Assistant Native Infrared",
+        commandsEncoding: "SignedRawTimings",
+        commandsUnit: "microseconds",
+      });
+    }
+
+    function processHaIrCommandsToRaw(data) {
+      return processCommands(data, encodeHomeAssistantAsRaw, {
+        supportedController: "MQTT",
+        commandsEncoding: "Raw",
+      }, isTimingArray);
+    }
+
+    function processHaIrCommandsToBroadlink(data) {
+      return processCommands(data, encodeHomeAssistantAsBroadlink, {
+        supportedController: "Broadlink",
+        commandsEncoding: "Base64",
+      }, isTimingArray);
+    }
+
+    function processHaCommandsForNative(data) {
+      return processCommands(data, (command) => (
+        toHomeAssistantTimings(getTimingsFromHomeAssistant(command))
+      ), {
+        supportedController: "Home Assistant Native Infrared",
+        commandsEncoding: "SignedRawTimings",
+        commandsUnit: "microseconds",
+      }, isTimingArray);
+    }
+
+    async function createNativeProfileCode(data) {
+      validateSmartIrClimate(data);
+      const format = detectSmartIrFormat(data);
+      const converted = {
+        broadlink: processBroadlinkCommandsToHaIr,
+        raw: processRawCommandsToHaIr,
+        ha: processHaCommandsForNative,
+      }[format](data);
+      const profile = {
+        format: "smartir-native-profile",
+        version: 1,
+        device: converted,
+      };
+      if (typeof CompressionStream === "undefined") {
+        throw new Error("This browser does not support local profile compression.");
+      }
+      const source = new TextEncoder().encode(JSON.stringify(profile));
+      const compressedStream = new Blob([source])
+        .stream()
+        .pipeThrough(new CompressionStream("gzip"));
+      const compressed = new Uint8Array(await new Response(compressedStream).arrayBuffer());
+      return {
+        code: `IRP1:${bytesToBase64(compressed)}`,
+        format,
+        name: integrationIdentity(converted).name.replace(/ Native IR$/, ""),
+      };
+    }
+
+    function detectSmartIrFormat(data) {
+      if (integrationSourceFormat.value !== "auto") {
+        return integrationSourceFormat.value;
+      }
+      if (data.commandsEncoding === "SignedRawTimings" || data.commandsUnit === "microseconds") {
+        return "ha";
+      }
+      if (data.supportedController === "Broadlink" || data.commandsEncoding === "Base64") {
+        return "broadlink";
+      }
+      if (data.supportedController === "MQTT" || data.commandsEncoding === "Raw") {
+        return "raw";
+      }
+      throw new Error("The SmartIR command format could not be detected.");
+    }
+
+    function validateSmartIrClimate(data) {
+      const requiredArrays = ["supportedModels", "operationModes", "fanModes"];
+      if (!data || typeof data !== "object" || !data.commands || typeof data.commands !== "object") {
+        throw new Error("Expected a SmartIR climate JSON file with a commands object.");
+      }
+      for (const key of requiredArrays) {
+        if (!Array.isArray(data[key]) || data[key].length === 0) {
+          throw new Error(`Missing or empty SmartIR field: ${key}`);
+        }
+      }
+      if (!Number.isFinite(data.minTemperature) || !Number.isFinite(data.maxTemperature)) {
+        throw new Error("SmartIR minimum and maximum temperatures are required.");
+      }
+      if (!data.commands.off) {
+        throw new Error("The SmartIR file does not contain an off command.");
+      }
+    }
+
+    function integrationIdentity(data) {
+      const manufacturer = String(data.manufacturer || "SmartIR").trim();
+      const model = String(data.supportedModels?.[0] || "Climate").trim();
+      const label = `${manufacturer} ${model}`.replace(/\s+/g, " ").trim();
+      const slug = label
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 36) || "climate";
+      return {
+        domain: `smartir_native_${slug}`,
+        name: `${label} Native IR`,
+      };
     }
 
     const MODE_COPY = {
       "to-raw": {
         title: "Broadlink to Raw MQTT",
         subtitle: "Upload a Broadlink JSON file, convert it to Raw MQTT, and download the new file. Everything happens locally in your browser.",
+        singleSubtitle: "Paste one Broadlink base64 code and convert it to one Raw MQTT code. Everything happens locally in your browser.",
         button: "Convert!",
         suffix: ".json",
+        process: processCommandsToRaw,
+        transform: encodeIr,
       },
       "to-broadlink": {
         title: "Raw MQTT to Broadlink",
         subtitle: "Upload a Raw MQTT JSON file, convert it back to Broadlink, and download the new file. Everything stays in your browser.",
+        singleSubtitle: "Paste one Raw MQTT code and convert it back to one Broadlink base64 code. Everything stays in your browser.",
         button: "Convert!",
         suffix: ".json",
+        process: processCommandsToBroadlink,
+        transform: decodeIr,
+      },
+      "broadlink-to-ha": {
+        title: "Broadlink to HA Infrared",
+        subtitle: "Upload a Broadlink JSON file and convert each command to Home Assistant native Infrared signed raw timings.",
+        singleSubtitle: "Paste one Broadlink base64 code and convert it to Home Assistant native Infrared signed raw timings.",
+        button: "Convert!",
+        suffix: ".ha-ir.json",
+        process: processBroadlinkCommandsToHaIr,
+        transform: encodeBroadlinkAsHomeAssistant,
+      },
+      "raw-to-ha": {
+        title: "Raw MQTT to HA Infrared",
+        subtitle: "Upload a Raw MQTT JSON file and convert each command to Home Assistant native Infrared signed raw timings.",
+        singleSubtitle: "Paste one Raw MQTT code and convert it to Home Assistant native Infrared signed raw timings.",
+        button: "Convert!",
+        suffix: ".ha-ir.json",
+        process: processRawCommandsToHaIr,
+        transform: encodeRawAsHomeAssistant,
+      },
+      "ha-to-raw": {
+        title: "HA Infrared to Raw MQTT",
+        subtitle: "Upload a Home Assistant native Infrared JSON file and convert each signed timing array to Raw MQTT.",
+        singleSubtitle: "Paste one Home Assistant native Infrared timing array and convert it to one Raw MQTT code.",
+        button: "Convert!",
+        suffix: ".json",
+        process: processHaIrCommandsToRaw,
+        transform: encodeHomeAssistantAsRaw,
+      },
+      "ha-to-broadlink": {
+        title: "HA Infrared to Broadlink",
+        subtitle: "Upload a Home Assistant native Infrared JSON file and convert each signed timing array to Broadlink base64.",
+        singleSubtitle: "Paste one Home Assistant native Infrared timing array and convert it to one Broadlink base64 code.",
+        button: "Convert!",
+        suffix: ".json",
+        process: processHaIrCommandsToBroadlink,
+        transform: encodeHomeAssistantAsBroadlink,
       },
     };
 
+    const FORMAT_NAMES = {
+      broadlink: "Broadlink",
+      raw: "Raw MQTT",
+      ha: "HA Infrared",
+    };
+
+    const FORMAT_VALUES = Object.keys(FORMAT_NAMES);
+
+    const FORMAT_MODE_MAP = {
+      "broadlink:raw": "to-raw",
+      "raw:broadlink": "to-broadlink",
+      "broadlink:ha": "broadlink-to-ha",
+      "raw:ha": "raw-to-ha",
+      "ha:raw": "ha-to-raw",
+      "ha:broadlink": "ha-to-broadlink",
+    };
+
+    let inputMode = "json";
     let currentMode = "to-raw";
 
-    function setMode(mode) {
+    function getModeFromFormats() {
+      return FORMAT_MODE_MAP[`${sourceFormatEl.value}:${targetFormatEl.value}`];
+    }
+
+    function ensureDifferentFormats(changedField) {
+      if (sourceFormatEl.value !== targetFormatEl.value) return;
+      const alternative = FORMAT_VALUES.find((value) => value !== (changedField === "source" ? sourceFormatEl.value : targetFormatEl.value));
+      if (changedField === "source") {
+        targetFormatEl.value = alternative;
+      } else {
+        sourceFormatEl.value = alternative;
+      }
+    }
+
+    function updateConvertButtonState() {
+      if (inputMode === "integration") {
+        convertBtn.disabled = !integrationFileInput.files.length;
+        return;
+      }
+      if (!currentMode) {
+        convertBtn.disabled = true;
+        return;
+      }
+      convertBtn.disabled = inputMode === "json"
+        ? !fileInput.files.length
+        : !singleInput.value.trim();
+    }
+
+    function setMode(mode, resetOutput = true) {
       currentMode = mode;
       const copy = MODE_COPY[mode];
       titleEl.textContent = copy.title;
-      subtitleEl.textContent = copy.subtitle;
+      subtitleEl.textContent = inputMode === "single" ? copy.singleSubtitle : copy.subtitle;
       convertBtn.textContent = copy.button;
-      tabs.forEach((tab) => {
-        const isActive = tab.dataset.mode === mode;
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      downloadLink.textContent = "Download converted file";
+      if (resetOutput) {
+        singleOutputRow.hidden = true;
+        singleOutput.value = "";
+        copyOutputBtn.textContent = "Copy";
+      }
+      singleInput.placeholder = sourceFormatEl.value === "ha"
+        ? "Paste one HA IR timing array, for example: [9000, -4500, 560, -560]"
+        : `Paste one ${FORMAT_NAMES[sourceFormatEl.value]} code here`;
+      singleInputNote.textContent = sourceFormatEl.value === "ha"
+        ? "HA IR single-code input must be a JSON array of signed timings."
+        : "Base64 code input is treated as one command.";
+      setStatus("");
+      updateConvertButtonState();
+    }
+
+    function updateModeFromFormats(resetOutput = true) {
+      const mode = getModeFromFormats();
+      if (!mode) {
+        currentMode = null;
+        titleEl.textContent = `${FORMAT_NAMES[sourceFormatEl.value]} to ${FORMAT_NAMES[targetFormatEl.value]}`;
+        subtitleEl.textContent = "Choose two different formats to run a conversion.";
+        convertBtn.disabled = true;
+        return;
+      }
+      setMode(mode, resetOutput);
+    }
+
+    function setInputMode(mode) {
+      inputMode = mode;
+      const isSingle = mode === "single";
+      const isIntegration = mode === "integration";
+      jsonPanel.hidden = isSingle || isIntegration;
+      singlePanel.hidden = !isSingle;
+      integrationPanel.hidden = !isIntegration;
+      formatPicker.hidden = isIntegration;
+      integrationFormatPicker.hidden = !isIntegration;
+      downloadLink.hidden = true;
+      downloadLink.textContent = "Download converted file";
+      singleOutputRow.hidden = true;
+      singleOutput.value = "";
+      copyOutputBtn.textContent = "Copy";
+      integrationOutputRow.hidden = true;
+      integrationOutput.value = "";
+      copyProfileBtn.textContent = "Copy";
+      modeTabs.forEach((tab) => {
+        const isActive = tab.dataset.inputMode === mode;
         tab.classList.toggle("active", isActive);
         tab.setAttribute("aria-selected", String(isActive));
       });
-      downloadLink.hidden = true;
-      downloadLink.href = "#";
       setStatus("");
+      if (isIntegration) {
+        titleEl.textContent = "SmartIR JSON to Native HA Profile";
+        subtitleEl.textContent = "Upload a SmartIR climate file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
+        convertBtn.textContent = "Create profile code";
+        currentMode = null;
+        updateConvertButtonState();
+      } else {
+        updateModeFromFormats(false);
+      }
     }
 
     function setSelectedFile(file) {
@@ -632,14 +1182,24 @@
       const dt = new DataTransfer();
       dt.items.add(file);
       fileInput.files = dt.files;
-      convertBtn.disabled = false;
+      updateConvertButtonState();
     }
 
     fileInput.addEventListener("change", () => {
-      convertBtn.disabled = !fileInput.files.length;
       downloadLink.hidden = true;
       downloadLink.href = "#";
       setStatus("");
+      updateConvertButtonState();
+    });
+
+    integrationFileInput.addEventListener("change", () => {
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+      integrationOutputRow.hidden = true;
+      integrationOutput.value = "";
+      copyProfileBtn.textContent = "Copy";
+      updateConvertButtonState();
     });
 
     ["dragenter", "dragover"].forEach((eventName) => {
@@ -667,45 +1227,187 @@
       setStatus("");
     });
 
-    tabs.forEach((tab) => {
+    ["dragenter", "dragover"].forEach((eventName) => {
+      integrationUpload.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        integrationUpload.classList.add("is-dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      integrationUpload.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        integrationUpload.classList.remove("is-dragover");
+      });
+    });
+
+    integrationUpload.addEventListener("drop", (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      integrationFileInput.files = dt.files;
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+      integrationOutputRow.hidden = true;
+      integrationOutput.value = "";
+      copyProfileBtn.textContent = "Copy";
+      updateConvertButtonState();
+    });
+
+    sourceFormatEl.addEventListener("change", () => {
+      ensureDifferentFormats("source");
+      if (inputMode !== "integration") updateModeFromFormats();
+    });
+
+    targetFormatEl.addEventListener("change", () => {
+      ensureDifferentFormats("target");
+      if (inputMode !== "integration") updateModeFromFormats();
+    });
+
+    integrationSourceFormat.addEventListener("change", () => {
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+      integrationOutputRow.hidden = true;
+      integrationOutput.value = "";
+      copyProfileBtn.textContent = "Copy";
+    });
+
+    modeTabs.forEach((tab) => {
       tab.addEventListener("click", () => {
-        if (tab.dataset.mode) {
-          setMode(tab.dataset.mode);
+        if (tab.dataset.inputMode) {
+          setInputMode(tab.dataset.inputMode);
         }
       });
     });
 
+    singleInput.addEventListener("input", () => {
+      singleOutputRow.hidden = true;
+      singleOutput.value = "";
+      copyOutputBtn.textContent = "Copy";
+      setStatus("");
+      updateConvertButtonState();
+    });
+
+    function parseSingleInput(value) {
+      const trimmed = value.trim();
+      if (sourceFormatEl.value === "ha") {
+        return JSON.parse(trimmed);
+      }
+      return trimmed;
+    }
+
+    function formatSingleOutput(value) {
+      return targetFormatEl.value === "ha" ? JSON.stringify(value, null, 2) : value;
+    }
+
     convertBtn.addEventListener("click", async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
+      if (!currentMode && inputMode !== "integration") return;
 
       convertBtn.disabled = true;
-      setStatus("Converting the file...");
+      setStatus(inputMode === "integration" ? "Generating the integration..." : "Converting the file...");
 
       try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        const processed =
-          currentMode === "to-raw"
-            ? processCommandsToRaw(data)
-            : processCommandsToBroadlink(data);
-        const outputText = JSON.stringify(processed, null, 2);
-        const blob = new Blob([outputText], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
+        if (inputMode === "integration") {
+          const file = integrationFileInput.files[0];
+          if (!file) return;
+          const data = JSON.parse(await file.text());
+          const profile = await createNativeProfileCode(data);
+          integrationOutput.value = profile.code;
+          integrationOutputRow.hidden = false;
+          copyProfileBtn.textContent = "Copy";
+          downloadLink.hidden = true;
+          setStatus(`${profile.name} profile is ready. Detected source format: ${FORMAT_NAMES[profile.format]}.`);
+        } else if (inputMode === "single") {
+          const input = parseSingleInput(singleInput.value);
+          const output = MODE_COPY[currentMode].transform(input);
+          singleOutput.value = formatSingleOutput(output);
+          singleOutputRow.hidden = false;
+          copyOutputBtn.textContent = "Copy";
+          downloadLink.hidden = true;
+          setStatus("Your converted code is ready.");
+        } else {
+          const file = fileInput.files[0];
+          if (!file) return;
+          const text = await file.text();
+          const data = JSON.parse(text);
+          const processed = MODE_COPY[currentMode].process(data);
+          const outputText = JSON.stringify(processed, null, 2);
+          const blob = new Blob([outputText], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
 
-        const baseName = file.name.replace(/\.json$/i, "") || "converted";
-        const suffix = MODE_COPY[currentMode].suffix;
-        downloadLink.href = url;
-        downloadLink.download = `${baseName}${suffix}`;
-        downloadLink.hidden = false;
-        setStatus("Your file is ready to download.");
+          const baseName = file.name.replace(/\.json$/i, "") || "converted";
+          const suffix = MODE_COPY[currentMode].suffix;
+          downloadLink.href = url;
+          downloadLink.download = `${baseName}${suffix}`;
+          downloadLink.hidden = false;
+          setStatus("Your file is ready to download.");
+        }
       } catch (error) {
         console.error(error);
-        setStatus("The file could not be read or is invalid. Make sure it's a JSON file.");
+        if (inputMode === "integration") {
+          setStatus(`The integration could not be generated. ${error.message || "Check the SmartIR file and its code format."}`);
+        } else {
+          setStatus(inputMode === "single"
+            ? "The code could not be converted. Check that the source format matches your input."
+            : "The file could not be read or is invalid. Make sure it's a JSON file.");
+        }
       } finally {
-        convertBtn.disabled = false;
+        updateConvertButtonState();
       }
     });
+
+    async function copySingleOutput() {
+      if (!singleOutput.value) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(singleOutput.value);
+        } else {
+          singleOutput.focus();
+          singleOutput.select();
+          document.execCommand("copy");
+        }
+        copyOutputBtn.textContent = "Copied!";
+        setStatus("Converted code copied.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Copy failed. Select the output text and copy it manually.");
+      }
+    }
+
+    copyOutputBtn.addEventListener("click", copySingleOutput);
+
+    async function copyProfileOutput() {
+      if (!integrationOutput.value) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(integrationOutput.value);
+        } else {
+          integrationOutput.focus();
+          integrationOutput.select();
+          document.execCommand("copy");
+        }
+        copyProfileBtn.textContent = "Copied!";
+        setStatus("Profile code copied. Open Home Assistant and paste it into SmartIR Native.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Copy failed. Select the profile code and copy it manually.");
+      }
+    }
+
+    copyProfileBtn.addEventListener("click", copyProfileOutput);
+
+    addToHaLink.addEventListener("click", () => {
+      if (integrationOutput.value && navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(integrationOutput.value).catch(() => {});
+      }
+    });
+
+    updateModeFromFormats(false);
   </script>
 </body>
 </html>
