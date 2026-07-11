@@ -14,11 +14,13 @@ No uploads, no Python, everything runs locally.
 
 The converter can process a full SmartIR JSON file or a single pasted IR code.
 
-It can also turn a SmartIR climate JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Each profile creates a native Climate entity and sends commands through a Home Assistant Infrared emitter entity, following the same consumer/emitter architecture used by integrations such as LG Infrared.
+It can also turn a SmartIR climate JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Each profile creates a native Climate entity and sends commands through a Home Assistant Infrared emitter entity.
 
 ## SmartIR Native installation
 
 SmartIR Native requires Home Assistant 2026.6 or newer.
+
+- [SmartIR Native integration source](https://github.com/tomer2526/Convert-Broadlink-Codes-to-Row-MQTT-Format/tree/main/custom_components/smartir_native)
 
 1. In HACS, add this repository as a custom Integration repository, or use the **Install with HACS** button on the website.
 2. Download SmartIR Native in HACS and restart Home Assistant.
@@ -37,5 +39,4 @@ Install the integration only once. Repeat steps 3-6 for every additional climate
 
 ## Home Assistant Infrared
 - [Home Assistant infrared entity documentation](https://developers.home-assistant.io/docs/core/entity/infrared/)
-- [Home Assistant LG Infrared integration](https://www.home-assistant.io/integrations/lg_infrared/)
 - [Zigbee IR bridge for native Home Assistant infrared](https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster/tree/main/custom_components/z2m_ir_bridge)
