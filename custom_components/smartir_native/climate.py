@@ -92,6 +92,7 @@ class SmartIrNativeClimate(
         self._remove_receiver_subscription: CALLBACK_TYPE | None = None
         self._send_lock = asyncio.Lock()
         self._last_on_mode: HVACMode | None = None
+        self._emitter_available = True
 
         self._attr_unique_id = f"{entry.entry_id}_climate"
         self._attr_device_info = DeviceInfo(
@@ -126,6 +127,14 @@ class SmartIrNativeClimate(
     async def async_added_to_hass(self) -> None:
         """Restore state and subscribe to the optional Infrared receiver."""
         await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass,
+                [self._infrared_emitter_entity_id],
+                self._emitter_state_changed,
+            )
+        )
+        self._refresh_emitter_availability()
         if self._infrared_receiver_entity_id:
             self.async_on_remove(
                 async_track_state_change_event(
@@ -156,6 +165,27 @@ class SmartIrNativeClimate(
                 self._attr_swing_mode = swing_mode
         if self._attr_hvac_mode != HVACMode.OFF:
             self._last_on_mode = self._attr_hvac_mode
+
+    @property
+    def available(self) -> bool:
+        """Mark the climate unavailable when its emitter is unavailable."""
+        return super().available and self._emitter_available
+
+    @callback
+    def _emitter_state_changed(
+        self, _event: Event[EventStateChangedData]
+    ) -> None:
+        """Update entity availability when the emitter state changes."""
+        self._refresh_emitter_availability()
+        self.async_write_ha_state()
+
+    @callback
+    def _refresh_emitter_availability(self) -> None:
+        """Cache current emitter availability."""
+        emitter_state = self.hass.states.get(self._infrared_emitter_entity_id)
+        self._emitter_available = (
+            emitter_state is not None and emitter_state.state != STATE_UNAVAILABLE
+        )
 
     @callback
     def _receiver_state_changed(self, event: Event[EventStateChangedData]) -> None:

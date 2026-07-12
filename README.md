@@ -14,7 +14,7 @@ No uploads, no Python, everything runs locally.
 
 The converter can process a full SmartIR JSON file or a single pasted IR code.
 
-It can also turn a SmartIR climate JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Each profile creates a native Climate entity and sends commands through a Home Assistant Infrared emitter entity.
+It can also turn a SmartIR climate JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Each profile creates a native Climate entity and sends commands through a Home Assistant Infrared emitter entity. If the configured emitter is unavailable, the climate entity is marked unavailable too.
 
 ## SmartIR Native installation
 
