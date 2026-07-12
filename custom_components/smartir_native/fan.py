@@ -145,20 +145,34 @@ class SmartIrNativeFan(SmartIrNativeReceiverEntity, FanEntity):
     async def _send_speed_command(self, speed: str) -> None:
         """Send a speed command for the current direction."""
         async with self._send_lock:
-            command_tree: Any = self._commands
-            if isinstance(command_tree, dict):
-                direction_node = find_command_value(
-                    command_tree,
-                    "forward" if self._attr_direction == DIRECTION_FORWARD else "reverse",
-                )
-                if isinstance(direction_node, dict):
-                    command_tree = direction_node
-            command = find_command_value(command_tree, speed)
+            command = self._resolve_speed_command(speed)
             if command is None:
                 raise HomeAssistantError(
                     f"SmartIR fan profile has no command for speed '{speed}'"
                 )
             await self._send_value(command)
+
+    def _resolve_speed_command(self, speed: str) -> Any:
+        """Resolve speed command from common SmartIR fan command structures."""
+        command_trees: list[Any] = []
+        direction_node = find_command_value(
+            self._commands,
+            "forward" if self._attr_direction == DIRECTION_FORWARD else "reverse",
+        )
+        if isinstance(direction_node, dict):
+            command_trees.append(direction_node)
+        command_trees.append(self._commands)
+
+        for command_tree in command_trees:
+            command = find_command_value(command_tree, speed)
+            if command is not None:
+                return command
+            default_tree = find_command_value(command_tree, "default")
+            if isinstance(default_tree, dict):
+                command = find_command_value(default_tree, speed)
+                if command is not None:
+                    return command
+        return None
 
     def _build_receiver_commands(self) -> dict[str, Any]:
         """Build command-key mapping for receiver signal matching."""
@@ -175,10 +189,20 @@ class SmartIrNativeFan(SmartIrNativeReceiverEntity, FanEntity):
             if not isinstance(direction_commands, dict):
                 continue
             for speed in self._speed_steps:
-                if command := find_command_value(direction_commands, speed):
+                command = find_command_value(direction_commands, speed)
+                if command is None and (
+                    default_tree := find_command_value(direction_commands, "default")
+                ) and isinstance(default_tree, dict):
+                    command = find_command_value(default_tree, speed)
+                if command is not None:
                     receiver_commands[f"{direction}:{speed}"] = command
         for speed in self._speed_steps:
-            if command := find_command_value(self._commands, speed):
+            command = find_command_value(self._commands, speed)
+            if command is None and (
+                default_tree := find_command_value(self._commands, "default")
+            ) and isinstance(default_tree, dict):
+                command = find_command_value(default_tree, speed)
+            if command is not None:
                 receiver_commands[f"speed:{speed}"] = command
         return receiver_commands
 
