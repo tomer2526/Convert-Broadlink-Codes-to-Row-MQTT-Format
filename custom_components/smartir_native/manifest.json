@@ -1,7 +1,7 @@
 {
   "domain": "smartir_native",
   "name": "SmartIR Native",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "config_flow": true,
   "documentation": "https://github.com/tomer2526/Convert-Broadlink-Codes-to-Row-MQTT-Format/tree/main/custom_components/smartir_native",
   "issue_tracker": "https://github.com/tomer2526/Convert-Broadlink-Codes-to-Row-MQTT-Format/issues",
