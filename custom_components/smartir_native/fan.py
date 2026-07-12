@@ -15,8 +15,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_INFRARED_ENTITY_ID, CONF_NAME, CONF_PROFILE_CODE, DOMAIN
-from .emitter_base import SmartIrNativeEmitterEntity, find_command_value
+from .const import (
+    CONF_INFRARED_ENTITY_ID,
+    CONF_INFRARED_RECEIVER_ENTITY_ID,
+    CONF_NAME,
+    CONF_PROFILE_CODE,
+    DOMAIN,
+)
+from .emitter_base import SmartIrNativeReceiverEntity, find_command_value
 from .profile import decode_profile_code
 
 
@@ -32,7 +38,7 @@ async def async_setup_entry(
     async_add_entities([SmartIrNativeFan(entry, data)])
 
 
-class SmartIrNativeFan(SmartIrNativeEmitterEntity, FanEntity):
+class SmartIrNativeFan(SmartIrNativeReceiverEntity, FanEntity):
     """A native Infrared fan entity driven by SmartIR command data."""
 
     _attr_has_entity_name = True
@@ -43,7 +49,11 @@ class SmartIrNativeFan(SmartIrNativeEmitterEntity, FanEntity):
             entry.options.get(
                 CONF_INFRARED_ENTITY_ID,
                 entry.data[CONF_INFRARED_ENTITY_ID],
-            )
+            ),
+            entry.options.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID,
+                entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
+            ),
         )
         self._commands = data["commands"]
         self._speed_steps = [str(item) for item in data["speed"]]
@@ -74,6 +84,7 @@ class SmartIrNativeFan(SmartIrNativeEmitterEntity, FanEntity):
             )
         )
         self._attr_is_on = False
+        self._set_receiver_commands(self._build_receiver_commands())
 
     async def async_turn_on(
         self, percentage: int | None = None, preset_mode: str | None = None, **kwargs: Any
@@ -148,3 +159,49 @@ class SmartIrNativeFan(SmartIrNativeEmitterEntity, FanEntity):
                     f"SmartIR fan profile has no command for speed '{speed}'"
                 )
             await self._send_value(command)
+
+    def _build_receiver_commands(self) -> dict[str, Any]:
+        """Build command-key mapping for receiver signal matching."""
+        receiver_commands: dict[str, Any] = {}
+        if off := find_command_value(self._commands, "off", "power_off", "power"):
+            receiver_commands["off"] = off
+        if on := find_command_value(self._commands, "on", "power_on", "power"):
+            receiver_commands["on"] = on
+        for direction_key, direction in (
+            ("forward", DIRECTION_FORWARD),
+            ("reverse", DIRECTION_REVERSE),
+        ):
+            direction_commands = find_command_value(self._commands, direction_key)
+            if not isinstance(direction_commands, dict):
+                continue
+            for speed in self._speed_steps:
+                if command := find_command_value(direction_commands, speed):
+                    receiver_commands[f"{direction}:{speed}"] = command
+        for speed in self._speed_steps:
+            if command := find_command_value(self._commands, speed):
+                receiver_commands[f"speed:{speed}"] = command
+        return receiver_commands
+
+    def _handle_matched_receiver_command(self, key: str) -> bool:
+        """Update fan state from one matched receiver command."""
+        old_state = (self._attr_is_on, self._attr_preset_mode, self._attr_direction)
+        if key == "off":
+            self._attr_is_on = False
+        elif key == "on":
+            self._attr_is_on = True
+        elif key.startswith("forward:"):
+            self._attr_direction = DIRECTION_FORWARD
+            self._attr_preset_mode = key.split(":", 1)[1]
+            self._attr_is_on = True
+        elif key.startswith("reverse:"):
+            self._attr_direction = DIRECTION_REVERSE
+            self._attr_preset_mode = key.split(":", 1)[1]
+            self._attr_is_on = True
+        elif key.startswith("speed:"):
+            self._attr_preset_mode = key.split(":", 1)[1]
+            self._attr_is_on = True
+        return old_state != (
+            self._attr_is_on,
+            self._attr_preset_mode,
+            self._attr_direction,
+        )

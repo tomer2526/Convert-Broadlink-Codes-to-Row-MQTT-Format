@@ -32,7 +32,6 @@ from .const import (
     DOMAIN,
 )
 from .profile import (
-    DEVICE_TYPE_CLIMATE,
     InvalidProfile,
     decode_profile_code,
     detect_device_type,
@@ -169,7 +168,6 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
             self._suggested_name,
             emitters,
             async_get_receivers(self.hass),
-            include_receiver=self._device_type == DEVICE_TYPE_CLIMATE,
         )
         return self.async_show_form(step_id="device", data_schema=schema)
 
@@ -178,8 +176,6 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Change the emitter, optional receiver, or entity name."""
         entry = self._get_reconfigure_entry()
-        device = decode_profile_code(entry.data[CONF_PROFILE_CODE])
-        include_receiver = detect_device_type(device) == DEVICE_TYPE_CLIMATE
         emitters = async_get_emitters(self.hass)
         current_emitter = entry.data[CONF_INFRARED_ENTITY_ID]
         if current_emitter not in emitters:
@@ -194,23 +190,17 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 **entry.data,
                 CONF_NAME: user_input[CONF_NAME],
                 CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-            }
-            if include_receiver:
-                updated_data[CONF_INFRARED_RECEIVER_ENTITY_ID] = user_input.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                     CONF_INFRARED_RECEIVER_ENTITY_ID
-                )
-            else:
-                updated_data.pop(CONF_INFRARED_RECEIVER_ENTITY_ID, None)
+                ),
+            }
             updated_options = {
                 **entry.options,
                 CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-            }
-            if include_receiver:
-                updated_options[CONF_INFRARED_RECEIVER_ENTITY_ID] = user_input.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                     CONF_INFRARED_RECEIVER_ENTITY_ID
-                )
-            else:
-                updated_options.pop(CONF_INFRARED_RECEIVER_ENTITY_ID, None)
+                ),
+            }
             return self.async_update_reload_and_abort(
                 entry,
                 title=user_input[CONF_NAME],
@@ -224,7 +214,6 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 entry.data[CONF_NAME],
                 emitters,
                 receivers,
-                include_receiver=include_receiver,
                 emitter=current_emitter,
                 receiver=current_receiver,
             ),
@@ -239,8 +228,6 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Show and save editable Infrared entities."""
         entry = self.config_entry
-        device = decode_profile_code(entry.data[CONF_PROFILE_CODE])
-        include_receiver = detect_device_type(device) == DEVICE_TYPE_CLIMATE
         current_emitter = entry.options.get(
             CONF_INFRARED_ENTITY_ID,
             entry.data[CONF_INFRARED_ENTITY_ID],
@@ -253,11 +240,10 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             data = {
                 CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-            }
-            if include_receiver:
-                data[CONF_INFRARED_RECEIVER_ENTITY_ID] = user_input.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                     CONF_INFRARED_RECEIVER_ENTITY_ID
-                )
+                ),
+            }
             return self.async_create_entry(data=data)
 
         emitters = async_get_emitters(self.hass)
@@ -279,7 +265,7 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
                 )
             )
         }
-        if include_receiver and receivers:
+        if receivers:
             receiver_marker = (
                 vol.Optional(
                     CONF_INFRARED_RECEIVER_ENTITY_ID,

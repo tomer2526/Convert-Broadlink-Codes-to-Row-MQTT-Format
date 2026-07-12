@@ -4,11 +4,22 @@ from typing import Any
 
 from infrared_protocols.commands import Command
 
-from homeassistant.components.infrared import InfraredEmitterConsumerEntity
+from homeassistant.components.infrared import (
+    InfraredEmitterConsumerEntity,
+    InfraredReceivedSignal,
+    async_subscribe_receiver,
+)
 from homeassistant.const import STATE_UNAVAILABLE
-from homeassistant.core import Event, EventStateChangedData, callback
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
+
+from .receiver import signals_match, timing_commands
 
 
 class StoredRawCommand(Command):
@@ -107,3 +118,96 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
             raise HomeAssistantError("Profile command payload is invalid")
         for timings in commands:
             await self._send_command(StoredRawCommand(timings))
+
+
+class SmartIrNativeReceiverEntity(SmartIrNativeEmitterEntity):
+    """Emitter entity that can also consume optional infrared receiver signals."""
+
+    def __init__(
+        self,
+        infrared_emitter_entity_id: str,
+        infrared_receiver_entity_id: str | None,
+    ) -> None:
+        """Initialize optional receiver tracking."""
+        super().__init__(infrared_emitter_entity_id)
+        self._infrared_receiver_entity_id = infrared_receiver_entity_id
+        self._remove_receiver_subscription: CALLBACK_TYPE | None = None
+        self._receiver_command_timings: dict[str, list[tuple[int, ...]]] = {}
+
+    async def async_added_to_hass(self) -> None:
+        """Track receiver lifecycle when the entity is added."""
+        await super().async_added_to_hass()
+        if self._infrared_receiver_entity_id:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass,
+                    [self._infrared_receiver_entity_id],
+                    self._receiver_state_changed,
+                )
+            )
+            self.async_on_remove(self._unsubscribe_receiver)
+            receiver_state = self.hass.states.get(self._infrared_receiver_entity_id)
+            if receiver_state is not None and receiver_state.state != STATE_UNAVAILABLE:
+                self._subscribe_receiver()
+
+    @callback
+    def _receiver_state_changed(self, event: Event[EventStateChangedData]) -> None:
+        """Subscribe while receiver is available and unsubscribe otherwise."""
+        new_state = event.data["new_state"]
+        if new_state is None or new_state.state == STATE_UNAVAILABLE:
+            self._unsubscribe_receiver()
+        else:
+            self._subscribe_receiver()
+
+    @callback
+    def _subscribe_receiver(self) -> None:
+        """Subscribe to the optional Infrared receiver."""
+        if (
+            not self._infrared_receiver_entity_id
+            or self._remove_receiver_subscription is not None
+        ):
+            return
+        try:
+            self._remove_receiver_subscription = async_subscribe_receiver(
+                self.hass,
+                self._infrared_receiver_entity_id,
+                self._handle_received_signal,
+            )
+        except HomeAssistantError:
+            self._remove_receiver_subscription = None
+
+    @callback
+    def _unsubscribe_receiver(self) -> None:
+        """Remove the optional receiver subscription."""
+        if self._remove_receiver_subscription is None:
+            return
+        self._remove_receiver_subscription()
+        self._remove_receiver_subscription = None
+
+    def _set_receiver_commands(self, commands: dict[str, Any]) -> None:
+        """Cache timing sequences used to match received commands."""
+        receiver_command_timings: dict[str, list[tuple[int, ...]]] = {}
+        for key, value in commands.items():
+            timings = timing_commands(value)
+            if timings:
+                receiver_command_timings[key] = timings
+        self._receiver_command_timings = receiver_command_timings
+
+    def _match_received_command_key(self, timings: list[int]) -> str | None:
+        """Return the first configured command key that matches timings."""
+        for key, command_sequences in self._receiver_command_timings.items():
+            if any(signals_match(sequence, timings) for sequence in command_sequences):
+                return key
+        return None
+
+    @callback
+    def _handle_received_signal(self, signal: InfraredReceivedSignal) -> None:
+        """Apply state updates when a known receiver command is observed."""
+        if (key := self._match_received_command_key(signal.timings)) is None:
+            return
+        if self._handle_matched_receiver_command(key):
+            self.async_write_ha_state()
+
+    def _handle_matched_receiver_command(self, key: str) -> bool:
+        """Handle one matched receiver command and return whether state changed."""
+        raise NotImplementedError
