@@ -15,7 +15,7 @@
       },
       "device": {
         "title": "Set up the entity",
-        "description": "Choose the Infrared emitter that controls this device. Climate profiles can also use an optional receiver to synchronize state when the physical remote is used.",
+        "description": "Choose the Infrared emitter that controls this device. You can also choose an optional receiver to synchronize state when the physical remote is used.",
         "data": {
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
@@ -24,7 +24,7 @@
       },
       "reconfigure": {
         "title": "Update SmartIR Native device",
-        "description": "Change the name, emitter, or optional receiver (climate only). Removing the receiver keeps normal transmit-only operation.",
+        "description": "Change the name, emitter, or optional receiver. Removing the receiver keeps normal transmit-only operation.",
         "data": {
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
@@ -45,7 +45,7 @@
     "step": {
       "init": {
         "title": "Edit Infrared entities",
-        "description": "Change the emitter or optional receiver used by this entity. Receiver options apply only to climate profiles.",
+        "description": "Change the emitter or optional receiver used by this entity.",
         "data": {
           "infrared_entity_id": "Infrared emitter",
           "infrared_receiver_entity_id": "Infrared receiver (optional)"

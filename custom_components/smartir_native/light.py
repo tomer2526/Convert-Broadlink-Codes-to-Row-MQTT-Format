@@ -15,8 +15,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_INFRARED_ENTITY_ID, CONF_NAME, CONF_PROFILE_CODE, DOMAIN
-from .emitter_base import SmartIrNativeEmitterEntity, find_command_value
+from .const import (
+    CONF_INFRARED_ENTITY_ID,
+    CONF_INFRARED_RECEIVER_ENTITY_ID,
+    CONF_NAME,
+    CONF_PROFILE_CODE,
+    DOMAIN,
+)
+from .emitter_base import SmartIrNativeReceiverEntity, find_command_value
 from .profile import decode_profile_code
 
 
@@ -32,7 +38,7 @@ async def async_setup_entry(
     async_add_entities([SmartIrNativeLight(entry, data)])
 
 
-class SmartIrNativeLight(SmartIrNativeEmitterEntity, LightEntity):
+class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity):
     """A native Infrared light entity driven by SmartIR command data."""
 
     _attr_has_entity_name = True
@@ -43,7 +49,11 @@ class SmartIrNativeLight(SmartIrNativeEmitterEntity, LightEntity):
             entry.options.get(
                 CONF_INFRARED_ENTITY_ID,
                 entry.data[CONF_INFRARED_ENTITY_ID],
-            )
+            ),
+            entry.options.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID,
+                entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
+            ),
         )
         self._commands = data["commands"]
         self._brightness_levels = [
@@ -78,6 +88,7 @@ class SmartIrNativeLight(SmartIrNativeEmitterEntity, LightEntity):
         else:
             self._attr_supported_color_modes = {ColorMode.ONOFF}
             self._attr_color_mode = ColorMode.ONOFF
+        self._set_receiver_commands(self._build_receiver_commands())
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light and optionally apply a brightness/temperature command."""
@@ -141,3 +152,51 @@ class SmartIrNativeLight(SmartIrNativeEmitterEntity, LightEntity):
             return None
         nearest = min(self._color_temperatures, key=lambda level: abs(level - kelvin))
         return find_command_value(color_temperature_commands, str(nearest), nearest)
+
+    def _build_receiver_commands(self) -> dict[str, Any]:
+        """Build command-key mapping for receiver signal matching."""
+        receiver_commands: dict[str, Any] = {}
+        if on := find_command_value(self._commands, "on", "power_on", "power"):
+            receiver_commands["on"] = on
+        if off := find_command_value(self._commands, "off", "power_off", "power"):
+            receiver_commands["off"] = off
+        brightness_commands = find_command_value(self._commands, "brightness")
+        if isinstance(brightness_commands, dict):
+            for level in self._brightness_levels:
+                if command := find_command_value(brightness_commands, str(level), level):
+                    receiver_commands[f"brightness:{level}"] = command
+        color_temperature_commands = find_command_value(
+            self._commands,
+            "colorTemperature",
+            "color_temperature",
+        )
+        if isinstance(color_temperature_commands, dict):
+            for kelvin in self._color_temperatures:
+                if command := find_command_value(
+                    color_temperature_commands, str(kelvin), kelvin
+                ):
+                    receiver_commands[f"color_temp:{kelvin}"] = command
+        return receiver_commands
+
+    def _handle_matched_receiver_command(self, key: str) -> bool:
+        """Update light state from one matched receiver command."""
+        old_state = (
+            self._attr_is_on,
+            self._attr_brightness,
+            self._attr_color_temp_kelvin,
+        )
+        if key == "off":
+            self._attr_is_on = False
+        elif key == "on":
+            self._attr_is_on = True
+        elif key.startswith("brightness:"):
+            self._attr_brightness = int(key.split(":", 1)[1])
+            self._attr_is_on = True
+        elif key.startswith("color_temp:"):
+            self._attr_color_temp_kelvin = int(key.split(":", 1)[1])
+            self._attr_is_on = True
+        return old_state != (
+            self._attr_is_on,
+            self._attr_brightness,
+            self._attr_color_temp_kelvin,
+        )

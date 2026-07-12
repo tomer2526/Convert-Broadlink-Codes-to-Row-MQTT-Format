@@ -13,8 +13,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_INFRARED_ENTITY_ID, CONF_NAME, CONF_PROFILE_CODE, DOMAIN
-from .emitter_base import SmartIrNativeEmitterEntity, find_command_value
+from .const import (
+    CONF_INFRARED_ENTITY_ID,
+    CONF_INFRARED_RECEIVER_ENTITY_ID,
+    CONF_NAME,
+    CONF_PROFILE_CODE,
+    DOMAIN,
+)
+from .emitter_base import SmartIrNativeReceiverEntity, find_command_value
 from .profile import decode_profile_code
 
 
@@ -30,7 +36,7 @@ async def async_setup_entry(
     async_add_entities([SmartIrNativeMediaPlayer(entry, data)])
 
 
-class SmartIrNativeMediaPlayer(SmartIrNativeEmitterEntity, MediaPlayerEntity):
+class SmartIrNativeMediaPlayer(SmartIrNativeReceiverEntity, MediaPlayerEntity):
     """A native Infrared media-player entity driven by SmartIR command data."""
 
     _attr_has_entity_name = True
@@ -41,7 +47,11 @@ class SmartIrNativeMediaPlayer(SmartIrNativeEmitterEntity, MediaPlayerEntity):
             entry.options.get(
                 CONF_INFRARED_ENTITY_ID,
                 entry.data[CONF_INFRARED_ENTITY_ID],
-            )
+            ),
+            entry.options.get(
+                CONF_INFRARED_RECEIVER_ENTITY_ID,
+                entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
+            ),
         )
         self._commands = data["commands"]
 
@@ -55,6 +65,7 @@ class SmartIrNativeMediaPlayer(SmartIrNativeEmitterEntity, MediaPlayerEntity):
         self._attr_state = MediaPlayerState.OFF
         self._attr_volume_level = 0.5
         self._attr_is_volume_muted = False
+        self._attr_source = None
         if isinstance(sources := find_command_value(self._commands, "sources"), dict):
             self._attr_source_list = [str(source) for source in sources]
         self._attr_supported_features = (
@@ -72,6 +83,7 @@ class SmartIrNativeMediaPlayer(SmartIrNativeEmitterEntity, MediaPlayerEntity):
         )
         if self._attr_source_list:
             self._attr_supported_features |= MediaPlayerEntityFeature.SELECT_SOURCE
+        self._set_receiver_commands(self._build_receiver_commands())
 
     async def async_turn_on(self) -> None:
         """Turn on the media player."""
@@ -191,3 +203,73 @@ class SmartIrNativeMediaPlayer(SmartIrNativeEmitterEntity, MediaPlayerEntity):
                 f"SmartIR media profile does not define command aliases: {', '.join(aliases)}"
             )
         await self._send_value(command)
+
+    def _build_receiver_commands(self) -> dict[str, Any]:
+        """Build command-key mapping for receiver signal matching."""
+        receiver_commands: dict[str, Any] = {}
+        for key, aliases in (
+            ("on", ("on", "power_on", "power")),
+            ("off", ("off", "power_off", "power")),
+            ("mute", ("mute",)),
+            ("volume_up", ("volume_up", "volumeUp")),
+            ("volume_down", ("volume_down", "volumeDown")),
+            ("play", ("play",)),
+            ("pause", ("pause",)),
+            ("stop", ("stop",)),
+            ("play_pause", ("play_pause", "playPause")),
+            ("next", ("next_track", "nextTrack", "next_channel", "nextChannel")),
+            (
+                "previous",
+                (
+                    "previous_track",
+                    "previousTrack",
+                    "previous_channel",
+                    "previousChannel",
+                ),
+            ),
+        ):
+            if command := find_command_value(self._commands, *aliases):
+                receiver_commands[key] = command
+        if isinstance(sources := find_command_value(self._commands, "sources"), dict):
+            for source, command in sources.items():
+                receiver_commands[f"source:{source}"] = command
+        return receiver_commands
+
+    def _handle_matched_receiver_command(self, key: str) -> bool:
+        """Update media-player state from one matched receiver command."""
+        old_state = (
+            self._attr_state,
+            self._attr_volume_level,
+            self._attr_is_volume_muted,
+            self._attr_source,
+        )
+        if key == "on":
+            self._attr_state = MediaPlayerState.ON
+        elif key == "off":
+            self._attr_state = MediaPlayerState.OFF
+        elif key == "mute":
+            self._attr_is_volume_muted = not self._attr_is_volume_muted
+        elif key == "volume_up":
+            self._attr_volume_level = min(1.0, self._attr_volume_level + 0.05)
+        elif key == "volume_down":
+            self._attr_volume_level = max(0.0, self._attr_volume_level - 0.05)
+        elif key == "play":
+            self._attr_state = MediaPlayerState.PLAYING
+        elif key == "pause":
+            self._attr_state = MediaPlayerState.PAUSED
+        elif key == "stop":
+            self._attr_state = MediaPlayerState.IDLE
+        elif key == "play_pause":
+            if self._attr_state == MediaPlayerState.PLAYING:
+                self._attr_state = MediaPlayerState.PAUSED
+            else:
+                self._attr_state = MediaPlayerState.PLAYING
+        elif key.startswith("source:"):
+            self._attr_source = key.split(":", 1)[1]
+            self._attr_state = MediaPlayerState.ON
+        return old_state != (
+            self._attr_state,
+            self._attr_volume_level,
+            self._attr_is_volume_muted,
+            self._attr_source,
+        )
