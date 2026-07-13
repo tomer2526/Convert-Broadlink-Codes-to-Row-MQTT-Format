@@ -24,16 +24,21 @@
       },
       "reconfigure": {
         "title": "Update SmartIR Native device",
-        "description": "Change the name, emitter, or optional receiver. Removing the receiver keeps normal transmit-only operation.",
+        "description": "View or replace the IRP1 profile code, and change the name, emitter, or optional receiver. The replacement profile must use the same device type.",
         "data": {
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
-          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+          "infrared_receiver_entity_id": "Infrared receiver (optional)",
+          "profile_code": "IRP1 profile code"
+        },
+        "data_description": {
+          "profile_code": "Paste a complete IRP1 code for the same type of device."
         }
       }
     },
     "error": {
-      "invalid_profile": "The profile code is invalid or unsupported. Generate it again and paste the complete code."
+      "invalid_profile": "The profile code is invalid or unsupported. Generate it again and paste the complete code.",
+      "profile_type_mismatch": "The replacement profile is for a different device type. Add it as a new SmartIR Native device instead."
     },
     "abort": {
       "no_infrared_emitters": "No Home Assistant Infrared emitter entity is available.",
@@ -44,13 +49,21 @@
   "options": {
     "step": {
       "init": {
-        "title": "Edit Infrared entities",
-        "description": "Change the emitter or optional receiver used by this entity.",
+        "title": "Edit SmartIR Native device",
+        "description": "View or replace the IRP1 profile code and change the emitter or optional receiver. The replacement profile must use the same device type.",
         "data": {
           "infrared_entity_id": "Infrared emitter",
-          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+          "infrared_receiver_entity_id": "Infrared receiver (optional)",
+          "profile_code": "IRP1 profile code"
+        },
+        "data_description": {
+          "profile_code": "Paste a complete IRP1 code for the same type of device."
         }
       }
+    },
+    "error": {
+      "invalid_profile": "The profile code is invalid or unsupported. Generate it again and paste the complete code.",
+      "profile_type_mismatch": "The replacement profile is for a different device type. Add it as a new SmartIR Native device instead."
     }
   }
 }

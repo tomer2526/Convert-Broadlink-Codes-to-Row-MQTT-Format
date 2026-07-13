@@ -47,6 +47,7 @@ def _device_schema(
     include_receiver: bool = True,
     emitter: str | None = None,
     receiver: str | None = None,
+    profile_code: str | None = None,
 ) -> vol.Schema:
     """Build the shared device form for setup and reconfiguration."""
     emitter_marker = (
@@ -77,7 +78,36 @@ def _device_schema(
         schema_fields[receiver_marker] = EntitySelector(
             EntitySelectorConfig(**receiver_config)
         )
+    if profile_code is not None:
+        schema_fields[
+            vol.Required(CONF_PROFILE_CODE, default=profile_code)
+        ] = _profile_code_selector()
     return vol.Schema(schema_fields)
+
+
+def _profile_code_selector() -> TextSelector:
+    """Build the multiline editor used for IRP1 profile codes."""
+    return TextSelector(
+        TextSelectorConfig(
+            multiline=True,
+            type=TextSelectorType.TEXT,
+        )
+    )
+
+
+def _normalize_updated_profile(
+    profile_code: str,
+    current_profile_code: str,
+) -> tuple[str | None, str | None]:
+    """Validate an edited profile and keep the existing entity platform."""
+    try:
+        device = decode_profile_code(profile_code)
+        current_device = decode_profile_code(current_profile_code)
+    except InvalidProfile:
+        return None, "invalid_profile"
+    if detect_device_type(device) != detect_device_type(current_device):
+        return None, "profile_type_mismatch"
+    return "".join(profile_code.split()), None
 
 
 class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -122,12 +152,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_PROFILE_CODE): TextSelector(
-                    TextSelectorConfig(
-                        multiline=True,
-                        type=TextSelectorType.TEXT,
-                    )
-                )
+                vol.Required(CONF_PROFILE_CODE): _profile_code_selector()
             }
         )
         return self.async_show_form(
@@ -185,28 +210,39 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
         if current_receiver and current_receiver not in receivers:
             receivers.append(current_receiver)
 
+        current_profile_code = entry.data[CONF_PROFILE_CODE]
+        errors: dict[str, str] = {}
         if user_input is not None:
-            updated_data = {
-                **entry.data,
-                CONF_NAME: user_input[CONF_NAME],
-                CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
-                    CONF_INFRARED_RECEIVER_ENTITY_ID
-                ),
-            }
-            updated_options = {
-                **entry.options,
-                CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
-                    CONF_INFRARED_RECEIVER_ENTITY_ID
-                ),
-            }
-            return self.async_update_reload_and_abort(
-                entry,
-                title=user_input[CONF_NAME],
-                data=updated_data,
-                options=updated_options,
+            profile_code, profile_error = _normalize_updated_profile(
+                user_input[CONF_PROFILE_CODE],
+                current_profile_code,
             )
+            if profile_error is not None:
+                errors[CONF_PROFILE_CODE] = profile_error
+            else:
+                assert profile_code is not None
+                updated_data = {
+                    **entry.data,
+                    CONF_NAME: user_input[CONF_NAME],
+                    CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
+                    CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
+                        CONF_INFRARED_RECEIVER_ENTITY_ID
+                    ),
+                    CONF_PROFILE_CODE: profile_code,
+                }
+                updated_options = {
+                    **entry.options,
+                    CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
+                    CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
+                        CONF_INFRARED_RECEIVER_ENTITY_ID
+                    ),
+                }
+                return self.async_update_reload_and_abort(
+                    entry,
+                    title=user_input[CONF_NAME],
+                    data=updated_data,
+                    options=updated_options,
+                )
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -216,12 +252,18 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 receivers,
                 emitter=current_emitter,
                 receiver=current_receiver,
+                profile_code=(
+                    user_input[CONF_PROFILE_CODE]
+                    if user_input is not None
+                    else current_profile_code
+                ),
             ),
+            errors=errors,
         )
 
 
 class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
-    """Edit the Infrared emitter and optional receiver."""
+    """Edit the profile code and Infrared entities."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -236,15 +278,32 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
             CONF_INFRARED_RECEIVER_ENTITY_ID,
             entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
         )
+        current_profile_code = entry.data[CONF_PROFILE_CODE]
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            data = {
-                CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
-                    CONF_INFRARED_RECEIVER_ENTITY_ID
-                ),
-            }
-            return self.async_create_entry(data=data)
+            profile_code, profile_error = _normalize_updated_profile(
+                user_input[CONF_PROFILE_CODE],
+                current_profile_code,
+            )
+            if profile_error is not None:
+                errors[CONF_PROFILE_CODE] = profile_error
+            else:
+                assert profile_code is not None
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={
+                        **entry.data,
+                        CONF_PROFILE_CODE: profile_code,
+                    },
+                )
+                data = {
+                    CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
+                    CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
+                        CONF_INFRARED_RECEIVER_ENTITY_ID
+                    ),
+                }
+                return self.async_create_entry(data=data)
 
         emitters = async_get_emitters(self.hass)
         if current_emitter not in emitters:
@@ -279,7 +338,18 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
         schema_fields[receiver_marker] = EntitySelector(
             EntitySelectorConfig(**receiver_config)
         )
+        schema_fields[
+            vol.Required(
+                CONF_PROFILE_CODE,
+                default=(
+                    user_input[CONF_PROFILE_CODE]
+                    if user_input is not None
+                    else current_profile_code
+                ),
+            )
+        ] = _profile_code_selector()
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
+            errors=errors,
         )

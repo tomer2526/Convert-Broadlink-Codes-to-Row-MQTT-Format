@@ -35,7 +35,7 @@ SmartIR Native requires Home Assistant 2026.6 or newer.
 5. Paste the code, choose the Infrared emitter, and name the entity.
 6. Optionally choose an Infrared receiver. When a known command is received from the physical remote, the entity state is synchronized for climate, fan, light, and media player profiles.
 
-Install the integration only once. Repeat steps 3-6 for every additional IR device. A receiver is optional; without one, the entity continues to work in transmit-only assumed-state mode. Use the integration's **Configure** button to change the emitter and add or replace a receiver later. The **Reconfigure** menu can also edit these fields together with the device name. Profile creation remains entirely local in the browser.
+Install the integration only once. Repeat steps 3-6 for every additional IR device. A receiver is optional; without one, the entity continues to work in transmit-only assumed-state mode. Use the integration's **Configure** button to view or replace the `IRP1:` profile code, change the emitter, and add or replace a receiver later. The replacement code must describe the same device type. The **Reconfigure** menu can also edit these fields together with the device name. Profile creation remains entirely local in the browser.
 
 [Try it!](https://tomer2526.github.io/Convert-Broadlink-Codes-to-Row-MQTT-Format/)
 
