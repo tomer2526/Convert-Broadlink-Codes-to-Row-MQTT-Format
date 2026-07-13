@@ -65,17 +65,17 @@ def _device_schema(
             )
         ),
     }
-    if include_receiver and receivers:
+    if include_receiver:
         receiver_marker = (
             vol.Optional(CONF_INFRARED_RECEIVER_ENTITY_ID, default=receiver)
             if receiver
             else vol.Optional(CONF_INFRARED_RECEIVER_ENTITY_ID)
         )
+        receiver_config = {"domain": INFRARED_DOMAIN}
+        if receivers:
+            receiver_config["include_entities"] = receivers
         schema_fields[receiver_marker] = EntitySelector(
-            EntitySelectorConfig(
-                domain=INFRARED_DOMAIN,
-                include_entities=receivers,
-            )
+            EntitySelectorConfig(**receiver_config)
         )
     return vol.Schema(schema_fields)
 
@@ -265,21 +265,20 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
                 )
             )
         }
+        receiver_marker = (
+            vol.Optional(
+                CONF_INFRARED_RECEIVER_ENTITY_ID,
+                default=current_receiver,
+            )
+            if current_receiver
+            else vol.Optional(CONF_INFRARED_RECEIVER_ENTITY_ID)
+        )
+        receiver_config = {"domain": INFRARED_DOMAIN}
         if receivers:
-            receiver_marker = (
-                vol.Optional(
-                    CONF_INFRARED_RECEIVER_ENTITY_ID,
-                    default=current_receiver,
-                )
-                if current_receiver
-                else vol.Optional(CONF_INFRARED_RECEIVER_ENTITY_ID)
-            )
-            schema_fields[receiver_marker] = EntitySelector(
-                EntitySelectorConfig(
-                    domain=INFRARED_DOMAIN,
-                    include_entities=receivers,
-                )
-            )
+            receiver_config["include_entities"] = receivers
+        schema_fields[receiver_marker] = EntitySelector(
+            EntitySelectorConfig(**receiver_config)
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_fields),
