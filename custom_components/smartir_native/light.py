@@ -25,6 +25,7 @@ from .const import (
 )
 from .emitter_base import SmartIrNativeReceiverEntity, find_command_value
 from .profile import decode_profile_code
+from .receiver import timing_commands
 
 STEP_COMMAND_DELAY = 0.3
 
@@ -61,6 +62,10 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
         self._color_temperatures = [
             int(level) for level in data.get("colorTemperature", [])
         ]
+        self._power_command_is_toggle = self._commands_are_identical(
+            find_command_value(self._commands, "on"),
+            find_command_value(self._commands, "off"),
+        )
         self._send_lock = asyncio.Lock()
 
         self._attr_unique_id = f"{entry.entry_id}_light"
@@ -148,7 +153,8 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
                     raise HomeAssistantError(
                         "SmartIR light profile has no usable turn-on command"
                     )
-                await self._send_value(on_command)
+                if not self._power_command_is_toggle or not self._attr_is_on:
+                    await self._send_value(on_command)
         self._attr_is_on = True
         self.async_write_ha_state()
 
@@ -158,6 +164,8 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
         command = find_command_value(self._commands, "off")
         if command is None:
             raise HomeAssistantError("SmartIR light profile has no off command")
+        if self._power_command_is_toggle and not self._attr_is_on:
+            return
         await self._send_value(command)
         self._attr_is_on = False
         self.async_write_ha_state()
@@ -235,7 +243,12 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
     def _build_receiver_commands(self) -> dict[str, Any]:
         """Index absolute and relative light commands for receiver matching."""
         receiver_commands: dict[str, Any] = {}
-        for key in ("on", "off", "brighten", "dim", "warmer", "colder", "night"):
+        if self._power_command_is_toggle:
+            receiver_commands["toggle"] = find_command_value(self._commands, "on")
+            power_keys: tuple[str, ...] = ()
+        else:
+            power_keys = ("on", "off")
+        for key in (*power_keys, "brighten", "dim", "warmer", "colder", "night"):
             command = find_command_value(self._commands, key)
             if command is not None:
                 receiver_commands[key] = command
@@ -248,7 +261,9 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
             self._attr_brightness,
             self._attr_color_temp_kelvin,
         )
-        if key == "off":
+        if key == "toggle":
+            self._attr_is_on = not self._attr_is_on
+        elif key == "off":
             self._attr_is_on = False
         elif key == "on":
             self._attr_is_on = True
@@ -274,6 +289,12 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
             self._attr_brightness,
             self._attr_color_temp_kelvin,
         )
+
+    @staticmethod
+    def _commands_are_identical(first: Any, second: Any) -> bool:
+        """Return whether on and off contain the same timing sequence."""
+        first_timings = timing_commands(first)
+        return bool(first_timings) and first_timings == timing_commands(second)
 
     @classmethod
     def _move_level(cls, levels: list[int], current: int, change: int) -> int:

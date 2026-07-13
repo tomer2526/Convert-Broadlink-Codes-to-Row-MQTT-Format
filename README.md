@@ -37,6 +37,8 @@ SmartIR Native requires Home Assistant 2026.6 or newer.
 
 Install the integration only once. Repeat steps 3-6 for every additional IR device. A receiver is optional; without one, the entity continues to work in transmit-only assumed-state mode. Use the integration's **Configure** button to view or replace the `IRP1:` profile code, change the emitter, and add or replace a receiver later. The replacement code must describe the same device type. The **Reconfigure** menu can also edit these fields together with the device name. Profile creation remains entirely local in the browser.
 
+Light profiles may use one shared IR command for both `on` and `off`. SmartIR Native treats this as a toggle command: Home Assistant avoids redundant transmissions, and an optional receiver toggles the entity state when the physical remote is used.
+
 [Try it!](https://tomer2526.github.io/Convert-Broadlink-Codes-to-Row-MQTT-Format/)
 
 ## SmartIR Guide
