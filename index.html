@@ -34,9 +34,11 @@
         var(--bg);
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 32px 18px 96px;
+      gap: 28px;
+      padding: 32px 18px;
     }
 
     .shell {
@@ -310,15 +312,13 @@
     }
 
     .footer-links {
-      position: fixed;
-      bottom: 20px;
-      left: 0;
-      right: 0;
+      width: min(920px, 100%);
       display: flex;
       justify-content: center;
       gap: 10px;
-      padding: 0 16px;
-      z-index: 2;
+      margin: 0 auto;
+      padding: 20px 0 4px;
+      border-top: 1px solid var(--border);
       flex-wrap: wrap;
     }
 
@@ -438,15 +438,15 @@
 
       <div id="integrationPanel" class="input-panel" hidden>
         <div class="row">
-          <div class="label">SmartIR climate file</div>
+          <div class="label">SmartIR device file</div>
           <div id="integrationUpload" class="upload">
             <input id="integrationFileInput" type="file" accept="application/json,.json" />
-            <div class="note">Drag a SmartIR climate JSON file here or choose it manually.</div>
+            <div class="note">Drag a SmartIR device JSON file here or choose it manually.</div>
           </div>
         </div>
         <div class="integration-details">
-          <strong>Install once, add as many climates as you need</strong>
-          <div class="note">Install SmartIR Native once through HACS. Every profile code can become a separate Climate entity, with an optional Infrared receiver that tracks commands sent from the physical remote.</div>
+          <strong>Install once, add as many devices as you need</strong>
+          <div class="note">Install SmartIR Native once through HACS. Every profile code can become a separate Home Assistant entity (climate, fan, light, or TV/media player). You can also use an optional Infrared receiver to track commands sent from the physical remote.</div>
           <div class="actions">
             <a class="download" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=tomer2526&amp;repository=Convert-Broadlink-Codes-to-Row-MQTT-Format&amp;category=integration" target="_blank" rel="noreferrer">Install with HACS</a>
           </div>
@@ -846,18 +846,23 @@
     }
 
     function processCommands(data, transformCommand, meta, shouldTransform = (value) => typeof value === "string") {
-      const walk = (node) => {
+      const walk = (node, path = []) => {
         if (shouldTransform(node)) {
-          return transformCommand(node);
+          try {
+            return transformCommand(node);
+          } catch (error) {
+            const location = ["commands", ...path].join(".");
+            throw new Error(`Could not convert ${location}: ${error.message}`, { cause: error });
+          }
         }
         if (Array.isArray(node)) {
-          return node.map((value) => walk(value));
+          return node.map((value, index) => walk(value, [...path, index]));
         }
         if (node && typeof node === "object") {
           const processed = {};
           for (const key in node) {
             if (!Object.prototype.hasOwnProperty.call(node, key)) continue;
-            processed[key] = walk(node[key]);
+            processed[key] = walk(node[key], [...path, key]);
           }
           return processed;
         }
@@ -923,14 +928,86 @@
       }, isTimingArray);
     }
 
+    function detectSmartIrDeviceType(data) {
+      const explicit = String(data?.type || "").trim().toLowerCase();
+      if (explicit === "tv") return "media_player";
+      if (["climate", "fan", "light", "media_player"].includes(explicit)) {
+        return explicit;
+      }
+      if (Array.isArray(data?.operationModes) && Array.isArray(data?.fanModes)) {
+        return "climate";
+      }
+      if (Array.isArray(data?.speed)) {
+        return "fan";
+      }
+      if (Array.isArray(data?.brightness) || Array.isArray(data?.colorTemperature)) {
+        return "light";
+      }
+      if (data?.commands && ["brighten", "dim", "warmer", "colder", "night"]
+        .some((command) => Object.prototype.hasOwnProperty.call(data.commands, command))) {
+        return "light";
+      }
+      return "media_player";
+    }
+
+    function validateSmartIrDevice(data, deviceType) {
+      if (!data || typeof data !== "object" || !data.commands || typeof data.commands !== "object") {
+        throw new Error("Expected a SmartIR device JSON file with a commands object.");
+      }
+      if (!Array.isArray(data.supportedModels) || data.supportedModels.length === 0) {
+        throw new Error("Missing or empty SmartIR field: supportedModels");
+      }
+      if (deviceType === "climate") {
+        for (const key of ["operationModes", "fanModes"]) {
+          if (!Array.isArray(data[key]) || data[key].length === 0) {
+            throw new Error(`Missing or empty SmartIR field: ${key}`);
+          }
+        }
+        if (!Number.isFinite(data.minTemperature) || !Number.isFinite(data.maxTemperature)) {
+          throw new Error("SmartIR minimum and maximum temperatures are required.");
+        }
+        if (!data.commands.off) {
+          throw new Error("The SmartIR climate file does not contain an off command.");
+        }
+      } else if (deviceType === "fan") {
+        if (!Array.isArray(data.speed) || data.speed.length === 0) {
+          throw new Error("Missing or empty SmartIR field: speed");
+        }
+        if (!data.commands.off) {
+          throw new Error("The SmartIR fan file does not contain an off command.");
+        }
+        const speedTrees = ["default", "forward", "reverse"]
+          .map((key) => data.commands[key])
+          .filter((value) => value && typeof value === "object" && !Array.isArray(value));
+        if (!speedTrees.length || data.speed.some((speed) => (
+          !speedTrees.some((tree) => Object.prototype.hasOwnProperty.call(tree, speed))
+        ))) {
+          throw new Error("The SmartIR fan file does not contain commands for every configured speed.");
+        }
+      } else if (deviceType === "light") {
+        for (const key of ["brightness", "colorTemperature"]) {
+          if (data[key] !== undefined && (!Array.isArray(data[key]) || data[key].length === 0)) {
+            throw new Error(`SmartIR light field ${key} must be a non-empty array.`);
+          }
+        }
+        if (!data.commands.on || !data.commands.off) {
+          throw new Error("The SmartIR light file must contain both on and off commands.");
+        }
+      } else if (!data.commands.on && !data.commands.off) {
+        throw new Error("The SmartIR file must contain at least an on or off command.");
+      }
+    }
+
     async function createNativeProfileCode(data) {
-      validateSmartIrClimate(data);
+      const deviceType = detectSmartIrDeviceType(data);
+      validateSmartIrDevice(data, deviceType);
       const format = detectSmartIrFormat(data);
       const converted = {
         broadlink: processBroadlinkCommandsToHaIr,
         raw: processRawCommandsToHaIr,
         ha: processHaCommandsForNative,
       }[format](data);
+      converted.type = deviceType;
       const profile = {
         format: "smartir-native-profile",
         version: 1,
@@ -947,6 +1024,7 @@
       return {
         code: `IRP1:${bytesToBase64(compressed)}`,
         format,
+        deviceType,
         name: integrationIdentity(converted).name.replace(/ Native IR$/, ""),
       };
     }
@@ -967,27 +1045,9 @@
       throw new Error("The SmartIR command format could not be detected.");
     }
 
-    function validateSmartIrClimate(data) {
-      const requiredArrays = ["supportedModels", "operationModes", "fanModes"];
-      if (!data || typeof data !== "object" || !data.commands || typeof data.commands !== "object") {
-        throw new Error("Expected a SmartIR climate JSON file with a commands object.");
-      }
-      for (const key of requiredArrays) {
-        if (!Array.isArray(data[key]) || data[key].length === 0) {
-          throw new Error(`Missing or empty SmartIR field: ${key}`);
-        }
-      }
-      if (!Number.isFinite(data.minTemperature) || !Number.isFinite(data.maxTemperature)) {
-        throw new Error("SmartIR minimum and maximum temperatures are required.");
-      }
-      if (!data.commands.off) {
-        throw new Error("The SmartIR file does not contain an off command.");
-      }
-    }
-
     function integrationIdentity(data) {
       const manufacturer = String(data.manufacturer || "SmartIR").trim();
-      const model = String(data.supportedModels?.[0] || "Climate").trim();
+      const model = String(data.supportedModels?.[0] || detectSmartIrDeviceType(data)).trim();
       const label = `${manufacturer} ${model}`.replace(/\s+/g, " ").trim();
       const slug = label
         .normalize("NFKD")
@@ -995,7 +1055,7 @@
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "")
-        .slice(0, 36) || "climate";
+        .slice(0, 36) || "device";
       return {
         domain: `smartir_native_${slug}`,
         name: `${label} Native IR`,
@@ -1168,7 +1228,7 @@
       setStatus("");
       if (isIntegration) {
         titleEl.textContent = "SmartIR JSON to Native HA Profile";
-        subtitleEl.textContent = "Upload a SmartIR climate file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
+        subtitleEl.textContent = "Upload a SmartIR climate/fan/light/TV file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
         convertBtn.textContent = "Create profile code";
         currentMode = null;
         updateConvertButtonState();
@@ -1321,7 +1381,7 @@
           integrationOutputRow.hidden = false;
           copyProfileBtn.textContent = "Copy";
           downloadLink.hidden = true;
-          setStatus(`${profile.name} profile is ready. Detected source format: ${FORMAT_NAMES[profile.format]}.`);
+          setStatus(`${profile.name} profile is ready (${profile.deviceType}). Detected source format: ${FORMAT_NAMES[profile.format]}.`);
         } else if (inputMode === "single") {
           const input = parseSingleInput(singleInput.value);
           const output = MODE_COPY[currentMode].transform(input);

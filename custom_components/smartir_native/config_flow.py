@@ -31,7 +31,12 @@ from .const import (
     CONF_PROFILE_CODE,
     DOMAIN,
 )
-from .profile import InvalidProfile, decode_profile_code, profile_name
+from .profile import (
+    InvalidProfile,
+    decode_profile_code,
+    detect_device_type,
+    profile_name,
+)
 
 
 def _device_schema(
@@ -39,6 +44,7 @@ def _device_schema(
     emitters: list[str],
     receivers: list[str],
     *,
+    include_receiver: bool = True,
     emitter: str | None = None,
     receiver: str | None = None,
 ) -> vol.Schema:
@@ -59,7 +65,7 @@ def _device_schema(
             )
         ),
     }
-    if receivers:
+    if include_receiver and receivers:
         receiver_marker = (
             vol.Optional(CONF_INFRARED_RECEIVER_ENTITY_ID, default=receiver)
             if receiver
@@ -75,7 +81,7 @@ def _device_schema(
 
 
 class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Add climate entities from portable SmartIR profile codes."""
+    """Add entities from portable SmartIR profile codes."""
 
     VERSION = 1
 
@@ -83,6 +89,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialize the flow."""
         self._profile_code: str | None = None
         self._suggested_name: str | None = None
+        self._device_type: str | None = None
 
     @staticmethod
     @callback
@@ -110,6 +117,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                     user_input[CONF_PROFILE_CODE].split()
                 )
                 self._suggested_name = profile_name(device)
+                self._device_type = detect_device_type(device)
                 return await self.async_step_device()
 
         schema = vol.Schema(
@@ -131,8 +139,12 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_device(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choose an emitter and name for the new climate entity."""
-        if self._profile_code is None or self._suggested_name is None:
+        """Choose an emitter and name for the new entity."""
+        if (
+            self._profile_code is None
+            or self._suggested_name is None
+            or self._device_type is None
+        ):
             return self.async_abort(reason="invalid_profile")
 
         emitters = async_get_emitters(self.hass)
@@ -226,14 +238,13 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
         )
 
         if user_input is not None:
-            return self.async_create_entry(
-                data={
-                    CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
-                    CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
-                        CONF_INFRARED_RECEIVER_ENTITY_ID
-                    ),
-                }
-            )
+            data = {
+                CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
+                CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
+                    CONF_INFRARED_RECEIVER_ENTITY_ID
+                ),
+            }
+            return self.async_create_entry(data=data)
 
         emitters = async_get_emitters(self.hass)
         if current_emitter not in emitters:

@@ -1,7 +1,7 @@
 {
   "title": "SmartIR Native",
   "config": {
-    "flow_title": "Add a SmartIR climate",
+    "flow_title": "Add a SmartIR device",
     "step": {
       "user": {
         "title": "Paste the profile code",
@@ -14,8 +14,8 @@
         }
       },
       "device": {
-        "title": "Set up the climate entity",
-        "description": "Choose the Infrared emitter that controls this device. Optionally choose a receiver to keep the entity synchronized when the physical remote is used.",
+        "title": "Set up the entity",
+        "description": "Choose the Infrared emitter that controls this device. You can also choose an optional receiver to synchronize state when the physical remote is used.",
         "data": {
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
@@ -45,7 +45,7 @@
     "step": {
       "init": {
         "title": "Edit Infrared entities",
-        "description": "Change the emitter or optional receiver used by this climate entity. Leave the receiver empty for transmit-only operation.",
+        "description": "Change the emitter or optional receiver used by this entity.",
         "data": {
           "infrared_entity_id": "Infrared emitter",
           "infrared_receiver_entity_id": "Infrared receiver (optional)"

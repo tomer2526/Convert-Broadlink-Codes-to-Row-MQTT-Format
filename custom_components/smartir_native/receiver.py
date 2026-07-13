@@ -26,12 +26,12 @@ def build_command_states(device: dict[str, Any]) -> list[CommandState]:
     commands = device["commands"]
     states = [
         CommandState(timings=timings, hvac_mode="off")
-        for timings in _timing_commands(commands["off"])
+        for timings in timing_commands(commands["off"])
     ]
     if "on" in commands:
         states.extend(
             CommandState(timings=timings, hvac_mode=ON_STATE)
-            for timings in _timing_commands(commands["on"])
+            for timings in timing_commands(commands["on"])
         )
     swing_modes = device.get("swingModes")
 
@@ -124,19 +124,19 @@ def _temperature_states(
                 swing_mode=swing_mode,
                 temperature=temperature,
             )
-            for timings in _timing_commands(command)
+            for timings in timing_commands(command)
         )
     return states
 
 
-def _timing_commands(value: Any) -> list[tuple[int, ...]]:
+def timing_commands(value: Any) -> list[tuple[int, ...]]:
     """Return one timing command or a list of sequential timing commands."""
     if value and isinstance(value, list) and isinstance(value[0], int):
         return [tuple(value)]
     if isinstance(value, list):
         commands: list[tuple[int, ...]] = []
         for item in value:
-            commands.extend(_timing_commands(item))
+            commands.extend(timing_commands(item))
         return commands
     return []
 

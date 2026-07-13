@@ -4,12 +4,9 @@ import asyncio
 import logging
 from typing import Any
 
-from infrared_protocols.commands import Command
-
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import ClimateEntityFeature, HVACMode
 from homeassistant.components.infrared import (
-    InfraredEmitterConsumerEntity,
     InfraredReceivedSignal,
     async_subscribe_receiver,
 )
@@ -35,24 +32,11 @@ from .const import (
     CONF_PROFILE_CODE,
     DOMAIN,
 )
+from .emitter_base import SmartIrNativeEmitterEntity
 from .profile import decode_profile_code
 from .receiver import ON_STATE, build_command_states, find_command_state
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class StoredRawCommand(Command):
-    """An IR command backed by signed microsecond timings."""
-
-    def __init__(self, timings: list[int]) -> None:
-        """Initialize a 38 kHz raw timing command."""
-        super().__init__(modulation=38000)
-        self._timings = timings
-
-    def get_raw_timings(self) -> list[int]:
-        """Return alternating positive pulse and negative space timings."""
-        return self._timings
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -66,23 +50,18 @@ async def async_setup_entry(
     async_add_entities([SmartIrNativeClimate(entry, data)])
 
 
-class SmartIrNativeClimate(
-    InfraredEmitterConsumerEntity, ClimateEntity, RestoreEntity
-):
+class SmartIrNativeClimate(SmartIrNativeEmitterEntity, ClimateEntity, RestoreEntity):
     """A native Infrared climate entity driven by SmartIR command data."""
 
-    _attr_assumed_state = True
-    _attr_has_entity_name = True
-    _attr_name = None
-    _attr_should_poll = False
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(self, entry: ConfigEntry, data: dict[str, Any]) -> None:
         """Initialize the entity from validated profile data."""
-        self._infrared_emitter_entity_id = entry.options.get(
+        infrared_emitter_entity_id = entry.options.get(
             CONF_INFRARED_ENTITY_ID,
             entry.data[CONF_INFRARED_ENTITY_ID],
         )
+        super().__init__(infrared_emitter_entity_id)
         self._infrared_receiver_entity_id = entry.options.get(
             CONF_INFRARED_RECEIVER_ENTITY_ID,
             entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
@@ -290,9 +269,3 @@ class SmartIrNativeClimate(
                 command = command[self._attr_swing_mode]
             temperature = f"{self._attr_target_temperature:g}"
             await self._send_value(command[temperature])
-
-    async def _send_value(self, value: Any) -> None:
-        """Send one timing array or a sequence of timing arrays."""
-        commands = [value] if value and isinstance(value[0], int) else value
-        for timings in commands:
-            await self._send_command(StoredRawCommand(timings))
