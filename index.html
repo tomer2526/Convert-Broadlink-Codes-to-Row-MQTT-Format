@@ -89,6 +89,33 @@
       width: min(520px, 100%);
     }
 
+    .integration-mode-tabs {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .integration-mode-tab {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 12px;
+      padding: 8px 13px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      box-shadow: none;
+      font-size: 0.86rem;
+    }
+
+    .integration-mode-tab.active {
+      color: var(--ink);
+      border-color: rgba(91, 214, 194, 0.5);
+      background: rgba(91, 214, 194, 0.12);
+    }
+
+    .integration-mode-tab:hover:not(:disabled) {
+      box-shadow: none;
+    }
+
     .format-field {
       display: grid;
       gap: 8px;
@@ -374,7 +401,6 @@
         <button class="mode-tab active" type="button" data-input-mode="json" role="tab" aria-selected="true">SmartIR JSON file</button>
         <button class="mode-tab" type="button" data-input-mode="single" role="tab" aria-selected="false">Single code</button>
         <button class="mode-tab" type="button" data-input-mode="integration" role="tab" aria-selected="false">Native HA integration</button>
-        <button class="mode-tab" type="button" data-input-mode="profile" role="tab" aria-selected="false">IRP1 to SmartIR JSON</button>
       </div>
       <div id="formatPicker" class="format-picker" aria-label="Conversion formats">
         <label class="format-field" for="sourceFormat">
@@ -438,49 +464,56 @@
       </div>
 
       <div id="integrationPanel" class="input-panel" hidden>
-        <div class="row">
-          <div class="label">SmartIR device file</div>
-          <div id="integrationUpload" class="upload">
-            <input id="integrationFileInput" type="file" accept="application/json,.json" />
-            <div class="note">Drag a SmartIR device JSON file here or choose it manually.</div>
-          </div>
+        <div class="integration-mode-tabs" role="tablist" aria-label="Native HA profile conversion">
+          <button class="integration-mode-tab active" type="button" data-integration-mode="encode" role="tab" aria-selected="true">SmartIR JSON to IRP1</button>
+          <button class="integration-mode-tab" type="button" data-integration-mode="decode" role="tab" aria-selected="false">IRP1 to SmartIR JSON</button>
         </div>
-        <div class="integration-details">
-          <strong>Install once, add as many devices as you need</strong>
-          <div class="note">Install SmartIR Native once through HACS. Every profile code can become a separate Home Assistant entity (climate, fan, light, or TV/media player). You can also use an optional Infrared receiver to track commands sent from the physical remote.</div>
-          <div class="actions">
-            <a class="download" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=tomer2526&amp;repository=Convert-Broadlink-Codes-to-Row-MQTT-Format&amp;category=integration" target="_blank" rel="noreferrer">Install with HACS</a>
-          </div>
-        </div>
-        <div id="integrationOutputRow" class="row" hidden>
-          <div class="label-row">
-            <div class="label">Profile code</div>
-            <button id="copyProfileBtn" class="copy-button" type="button">Copy</button>
-          </div>
-          <textarea id="integrationOutput" spellcheck="false" readonly></textarea>
-          <div class="note">The Add to Home Assistant button also copies the profile code when clipboard access is available. Paste it in the setup flow and choose your Infrared emitter.</div>
-          <div class="actions">
-            <a id="addToHaLink" class="download" href="https://my.home-assistant.io/redirect/config_flow_start/?domain=smartir_native" target="_blank" rel="noreferrer">Add to Home Assistant</a>
-          </div>
-        </div>
-      </div>
 
-      <div id="profilePanel" class="input-panel" hidden>
-        <div class="row">
-          <div class="label">IRP1 profile code</div>
-          <textarea id="profileInput" spellcheck="false" placeholder="Paste the complete IRP1: code here"></textarea>
-          <div id="profileUpload" class="upload">
-            <input id="profileFileInput" type="file" accept="text/plain,.txt,.irp1" />
-            <div class="note">You can also drag a text file containing the IRP1 code here.</div>
+        <div id="integrationEncodePanel">
+          <div class="row">
+            <div class="label">SmartIR device file</div>
+            <div id="integrationUpload" class="upload">
+              <input id="integrationFileInput" type="file" accept="application/json,.json" />
+              <div class="note">Drag a SmartIR device JSON file here or choose it manually.</div>
+            </div>
+          </div>
+          <div class="integration-details">
+            <strong>Install once, add as many devices as you need</strong>
+            <div class="note">Install SmartIR Native once through HACS. Every profile code can become a separate Home Assistant entity (climate, fan, light, or TV/media player). You can also use an optional Infrared receiver to track commands sent from the physical remote.</div>
+            <div class="actions">
+              <a class="download" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=tomer2526&amp;repository=Convert-Broadlink-Codes-to-Row-MQTT-Format&amp;category=integration" target="_blank" rel="noreferrer">Install with HACS</a>
+            </div>
+          </div>
+          <div id="integrationOutputRow" class="row" hidden>
+            <div class="label-row">
+              <div class="label">Profile code</div>
+              <button id="copyProfileBtn" class="copy-button" type="button">Copy</button>
+            </div>
+            <textarea id="integrationOutput" spellcheck="false" readonly></textarea>
+            <div class="note">The Add to Home Assistant button also copies the profile code when clipboard access is available. Paste it in the setup flow and choose your Infrared emitter.</div>
+            <div class="actions">
+              <a id="addToHaLink" class="download" href="https://my.home-assistant.io/redirect/config_flow_start/?domain=smartir_native" target="_blank" rel="noreferrer">Add to Home Assistant</a>
+            </div>
           </div>
         </div>
-        <div id="profileOutputRow" class="row" hidden>
-          <div class="label-row">
-            <div class="label">SmartIR JSON</div>
-            <button id="copyProfileJsonBtn" class="copy-button" type="button">Copy</button>
+
+        <div id="profilePanel" hidden>
+          <div class="row">
+            <div class="label">IRP1 profile code</div>
+            <textarea id="profileInput" spellcheck="false" placeholder="Paste the complete IRP1: code here"></textarea>
+            <div id="profileUpload" class="upload">
+              <input id="profileFileInput" type="file" accept="text/plain,.txt,.irp1" />
+              <div class="note">You can also drag a text file containing the IRP1 code here.</div>
+            </div>
           </div>
-          <textarea id="profileOutput" spellcheck="false" readonly></textarea>
-          <div class="note">The extracted commands use Home Assistant signed raw timings. Use the SmartIR JSON converter above if you need Broadlink or Raw MQTT.</div>
+          <div id="profileOutputRow" class="row" hidden>
+            <div class="label-row">
+              <div class="label">SmartIR JSON</div>
+              <button id="copyProfileJsonBtn" class="copy-button" type="button">Copy</button>
+            </div>
+            <textarea id="profileOutput" spellcheck="false" readonly></textarea>
+            <div class="note">The extracted commands use Home Assistant signed raw timings. Use the SmartIR JSON converter above if you need Broadlink or Raw MQTT.</div>
+          </div>
         </div>
       </div>
 
@@ -515,9 +548,11 @@
     const integrationFormatPicker = document.getElementById("integrationFormatPicker");
     const integrationSourceFormat = document.getElementById("integrationSourceFormat");
     const modeTabs = Array.from(document.querySelectorAll(".mode-tab"));
+    const integrationModeTabs = Array.from(document.querySelectorAll(".integration-mode-tab"));
     const jsonPanel = document.getElementById("jsonPanel");
     const singlePanel = document.getElementById("singlePanel");
     const integrationPanel = document.getElementById("integrationPanel");
+    const integrationEncodePanel = document.getElementById("integrationEncodePanel");
     const integrationFileInput = document.getElementById("integrationFileInput");
     const integrationUpload = document.getElementById("integrationUpload");
     const integrationOutputRow = document.getElementById("integrationOutputRow");
@@ -1231,6 +1266,7 @@
     };
 
     let inputMode = "json";
+    let integrationMode = "encode";
     let currentMode = "to-raw";
 
     function getModeFromFormats() {
@@ -1248,12 +1284,10 @@
     }
 
     function updateConvertButtonState() {
-      if (inputMode === "profile") {
-        convertBtn.disabled = !profileInput.value.trim();
-        return;
-      }
       if (inputMode === "integration") {
-        convertBtn.disabled = !integrationFileInput.files.length;
+        convertBtn.disabled = integrationMode === "decode"
+          ? !profileInput.value.trim()
+          : !integrationFileInput.files.length;
         return;
       }
       if (!currentMode) {
@@ -1301,17 +1335,51 @@
       setMode(mode, resetOutput);
     }
 
+    function setIntegrationMode(mode, resetOutput = true) {
+      integrationMode = mode;
+      const isDecode = mode === "decode";
+      integrationEncodePanel.hidden = isDecode;
+      profilePanel.hidden = !isDecode;
+      integrationFormatPicker.hidden = inputMode !== "integration" || isDecode;
+      integrationModeTabs.forEach((tab) => {
+        const isActive = tab.dataset.integrationMode === mode;
+        tab.classList.toggle("active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+      });
+      currentMode = null;
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      downloadLink.textContent = "Download converted file";
+      if (resetOutput) {
+        integrationOutputRow.hidden = true;
+        integrationOutput.value = "";
+        copyProfileBtn.textContent = "Copy";
+        profileOutputRow.hidden = true;
+        profileOutput.value = "";
+        copyProfileJsonBtn.textContent = "Copy";
+        setStatus("");
+      }
+      if (isDecode) {
+        titleEl.textContent = "IRP1 Profile to SmartIR JSON";
+        subtitleEl.textContent = "Paste an IRP1 profile code and extract its complete SmartIR device JSON. The profile stays in your browser.";
+        convertBtn.textContent = "Extract SmartIR JSON";
+      } else {
+        titleEl.textContent = "SmartIR JSON to Native HA Profile";
+        subtitleEl.textContent = "Upload a SmartIR climate/fan/light/TV file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
+        convertBtn.textContent = "Create profile code";
+      }
+      updateConvertButtonState();
+    }
+
     function setInputMode(mode) {
       inputMode = mode;
       const isSingle = mode === "single";
       const isIntegration = mode === "integration";
-      const isProfile = mode === "profile";
-      jsonPanel.hidden = isSingle || isIntegration || isProfile;
+      jsonPanel.hidden = isSingle || isIntegration;
       singlePanel.hidden = !isSingle;
       integrationPanel.hidden = !isIntegration;
-      profilePanel.hidden = !isProfile;
-      formatPicker.hidden = isIntegration || isProfile;
-      integrationFormatPicker.hidden = !isIntegration;
+      formatPicker.hidden = isIntegration;
+      integrationFormatPicker.hidden = !isIntegration || integrationMode === "decode";
       downloadLink.hidden = true;
       downloadLink.textContent = "Download converted file";
       singleOutputRow.hidden = true;
@@ -1330,17 +1398,7 @@
       });
       setStatus("");
       if (isIntegration) {
-        titleEl.textContent = "SmartIR JSON to Native HA Profile";
-        subtitleEl.textContent = "Upload a SmartIR climate/fan/light/TV file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
-        convertBtn.textContent = "Create profile code";
-        currentMode = null;
-        updateConvertButtonState();
-      } else if (isProfile) {
-        titleEl.textContent = "IRP1 Profile to SmartIR JSON";
-        subtitleEl.textContent = "Paste an IRP1 profile code and extract its complete SmartIR device JSON. The profile stays in your browser.";
-        convertBtn.textContent = "Extract SmartIR JSON";
-        currentMode = null;
-        updateConvertButtonState();
+        setIntegrationMode(integrationMode, false);
       } else {
         updateModeFromFormats(false);
       }
@@ -1498,6 +1556,14 @@
       });
     });
 
+    integrationModeTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        if (tab.dataset.integrationMode) {
+          setIntegrationMode(tab.dataset.integrationMode);
+        }
+      });
+    });
+
     singleInput.addEventListener("input", () => {
       singleOutputRow.hidden = true;
       singleOutput.value = "";
@@ -1529,38 +1595,40 @@
     }
 
     convertBtn.addEventListener("click", async () => {
-      if (!currentMode && !["integration", "profile"].includes(inputMode)) return;
+      if (!currentMode && inputMode !== "integration") return;
 
       convertBtn.disabled = true;
       setStatus(inputMode === "integration"
-        ? "Generating the integration..."
-        : inputMode === "profile"
+        ? integrationMode === "decode"
           ? "Extracting the SmartIR JSON..."
-          : "Converting the file...");
+          : "Generating the integration..."
+        : "Converting the file...");
 
       try {
-        if (inputMode === "profile") {
-          const device = await decodeNativeProfileCode(profileInput.value);
-          const outputText = JSON.stringify(device, null, 2);
-          profileOutput.value = outputText;
-          profileOutputRow.hidden = false;
-          copyProfileJsonBtn.textContent = "Copy";
-          const blob = new Blob([outputText], { type: "application/json" });
-          downloadLink.href = URL.createObjectURL(blob);
-          downloadLink.download = "smartir-profile.json";
-          downloadLink.textContent = "Download SmartIR JSON";
-          downloadLink.hidden = false;
-          setStatus(`SmartIR JSON extracted (${detectSmartIrDeviceType(device)}).`);
-        } else if (inputMode === "integration") {
-          const file = integrationFileInput.files[0];
-          if (!file) return;
-          const data = JSON.parse(await file.text());
-          const profile = await createNativeProfileCode(data);
-          integrationOutput.value = profile.code;
-          integrationOutputRow.hidden = false;
-          copyProfileBtn.textContent = "Copy";
-          downloadLink.hidden = true;
-          setStatus(`${profile.name} profile is ready (${profile.deviceType}). Detected source format: ${FORMAT_NAMES[profile.format]}.`);
+        if (inputMode === "integration") {
+          if (integrationMode === "decode") {
+            const device = await decodeNativeProfileCode(profileInput.value);
+            const outputText = JSON.stringify(device, null, 2);
+            profileOutput.value = outputText;
+            profileOutputRow.hidden = false;
+            copyProfileJsonBtn.textContent = "Copy";
+            const blob = new Blob([outputText], { type: "application/json" });
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = "smartir-profile.json";
+            downloadLink.textContent = "Download SmartIR JSON";
+            downloadLink.hidden = false;
+            setStatus(`SmartIR JSON extracted (${detectSmartIrDeviceType(device)}).`);
+          } else {
+            const file = integrationFileInput.files[0];
+            if (!file) return;
+            const data = JSON.parse(await file.text());
+            const profile = await createNativeProfileCode(data);
+            integrationOutput.value = profile.code;
+            integrationOutputRow.hidden = false;
+            copyProfileBtn.textContent = "Copy";
+            downloadLink.hidden = true;
+            setStatus(`${profile.name} profile is ready (${profile.deviceType}). Detected source format: ${FORMAT_NAMES[profile.format]}.`);
+          }
         } else if (inputMode === "single") {
           const input = parseSingleInput(singleInput.value);
           const output = MODE_COPY[currentMode].transform(input);
@@ -1588,10 +1656,10 @@
         }
       } catch (error) {
         console.error(error);
-        if (inputMode === "profile") {
-          setStatus(`The IRP1 code could not be decoded. ${error.message || "Check that the complete code was pasted."}`);
-        } else if (inputMode === "integration") {
-          setStatus(`The integration could not be generated. ${error.message || "Check the SmartIR file and its code format."}`);
+        if (inputMode === "integration") {
+          setStatus(integrationMode === "decode"
+            ? `The IRP1 code could not be decoded. ${error.message || "Check that the complete code was pasted."}`
+            : `The integration could not be generated. ${error.message || "Check the SmartIR file and its code format."}`);
         } else {
           setStatus(inputMode === "single"
             ? "The code could not be converted. Check that the source format matches your input."
