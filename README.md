@@ -37,6 +37,8 @@ SmartIR Native requires Home Assistant 2026.6 or newer.
 
 Install the integration only once. Repeat steps 3-6 for every additional IR device. A receiver is optional; without one, the entity continues to work in transmit-only assumed-state mode. Use the integration's **Configure** button to change the emitter and add or replace a receiver later. The **Reconfigure** menu can also edit these fields together with the device name. Profile creation remains entirely local in the browser.
 
+[Try it!](https://tomer2526.github.io/Convert-Broadlink-Codes-to-Row-MQTT-Format/)
+
 ## SmartIR Guide
 - [Zigbee SmartIR guide](https://community.home-assistant.io/t/guide-how-to-use-the-zs06-or-ufo-r11-zigbee-ir-controllers-with-smartir/939301?u=tomer11)
 
