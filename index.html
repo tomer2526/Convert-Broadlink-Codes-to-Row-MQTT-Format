@@ -498,6 +498,14 @@
         </div>
 
         <div id="profilePanel" hidden>
+          <label class="format-field" for="profileTargetFormat">
+            <span>SmartIR JSON command format</span>
+            <select id="profileTargetFormat">
+              <option value="broadlink">Broadlink</option>
+              <option value="raw">Raw MQTT</option>
+              <option value="ha" selected>HA IR</option>
+            </select>
+          </label>
           <div class="row">
             <div class="label">IRP1 profile code</div>
             <textarea id="profileInput" spellcheck="false" placeholder="Paste the complete IRP1: code here"></textarea>
@@ -512,7 +520,7 @@
               <button id="copyProfileJsonBtn" class="copy-button" type="button">Copy</button>
             </div>
             <textarea id="profileOutput" spellcheck="false" readonly></textarea>
-            <div class="note">The extracted commands use Home Assistant signed raw timings. Use the SmartIR JSON converter above if you need Broadlink or Raw MQTT.</div>
+            <div class="note">The complete SmartIR device file uses the command format selected above.</div>
           </div>
         </div>
       </div>
@@ -560,6 +568,7 @@
     const copyProfileBtn = document.getElementById("copyProfileBtn");
     const addToHaLink = document.getElementById("addToHaLink");
     const profilePanel = document.getElementById("profilePanel");
+    const profileTargetFormat = document.getElementById("profileTargetFormat");
     const profileInput = document.getElementById("profileInput");
     const profileFileInput = document.getElementById("profileFileInput");
     const profileUpload = document.getElementById("profileUpload");
@@ -1361,7 +1370,7 @@
       }
       if (isDecode) {
         titleEl.textContent = "IRP1 Profile to SmartIR JSON";
-        subtitleEl.textContent = "Paste an IRP1 profile code and extract its complete SmartIR device JSON. The profile stays in your browser.";
+        subtitleEl.textContent = "Paste an IRP1 profile code, choose Broadlink, Raw MQTT, or HA IR, and extract the complete SmartIR device JSON locally.";
         convertBtn.textContent = "Extract SmartIR JSON";
       } else {
         titleEl.textContent = "SmartIR JSON to Native HA Profile";
@@ -1582,6 +1591,15 @@
       updateConvertButtonState();
     });
 
+    profileTargetFormat.addEventListener("change", () => {
+      profileOutputRow.hidden = true;
+      profileOutput.value = "";
+      copyProfileJsonBtn.textContent = "Copy";
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+    });
+
     function parseSingleInput(value) {
       const trimmed = value.trim();
       if (sourceFormatEl.value === "ha") {
@@ -1608,16 +1626,22 @@
         if (inputMode === "integration") {
           if (integrationMode === "decode") {
             const device = await decodeNativeProfileCode(profileInput.value);
-            const outputText = JSON.stringify(device, null, 2);
+            const targetFormat = profileTargetFormat.value;
+            const convertedDevice = {
+              broadlink: processHaIrCommandsToBroadlink,
+              raw: processHaIrCommandsToRaw,
+              ha: processHaCommandsForNative,
+            }[targetFormat](device);
+            const outputText = JSON.stringify(convertedDevice, null, 2);
             profileOutput.value = outputText;
             profileOutputRow.hidden = false;
             copyProfileJsonBtn.textContent = "Copy";
             const blob = new Blob([outputText], { type: "application/json" });
             downloadLink.href = URL.createObjectURL(blob);
-            downloadLink.download = "smartir-profile.json";
+            downloadLink.download = `smartir-${targetFormat}.json`;
             downloadLink.textContent = "Download SmartIR JSON";
             downloadLink.hidden = false;
-            setStatus(`SmartIR JSON extracted (${detectSmartIrDeviceType(device)}).`);
+            setStatus(`SmartIR JSON extracted as ${FORMAT_NAMES[targetFormat]} (${detectSmartIrDeviceType(device)}).`);
           } else {
             const file = integrationFileInput.files[0];
             if (!file) return;
