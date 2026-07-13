@@ -374,6 +374,7 @@
         <button class="mode-tab active" type="button" data-input-mode="json" role="tab" aria-selected="true">SmartIR JSON file</button>
         <button class="mode-tab" type="button" data-input-mode="single" role="tab" aria-selected="false">Single code</button>
         <button class="mode-tab" type="button" data-input-mode="integration" role="tab" aria-selected="false">Native HA integration</button>
+        <button class="mode-tab" type="button" data-input-mode="profile" role="tab" aria-selected="false">IRP1 to SmartIR JSON</button>
       </div>
       <div id="formatPicker" class="format-picker" aria-label="Conversion formats">
         <label class="format-field" for="sourceFormat">
@@ -464,6 +465,25 @@
         </div>
       </div>
 
+      <div id="profilePanel" class="input-panel" hidden>
+        <div class="row">
+          <div class="label">IRP1 profile code</div>
+          <textarea id="profileInput" spellcheck="false" placeholder="Paste the complete IRP1: code here"></textarea>
+          <div id="profileUpload" class="upload">
+            <input id="profileFileInput" type="file" accept="text/plain,.txt,.irp1" />
+            <div class="note">You can also drag a text file containing the IRP1 code here.</div>
+          </div>
+        </div>
+        <div id="profileOutputRow" class="row" hidden>
+          <div class="label-row">
+            <div class="label">SmartIR JSON</div>
+            <button id="copyProfileJsonBtn" class="copy-button" type="button">Copy</button>
+          </div>
+          <textarea id="profileOutput" spellcheck="false" readonly></textarea>
+          <div class="note">The extracted commands use Home Assistant signed raw timings. Use the SmartIR JSON converter above if you need Broadlink or Raw MQTT.</div>
+        </div>
+      </div>
+
       <div class="actions">
         <button id="convertBtn" disabled>Convert!</button>
         <a id="downloadLink" class="download" href="#" download hidden>Download converted file</a>
@@ -504,6 +524,13 @@
     const integrationOutput = document.getElementById("integrationOutput");
     const copyProfileBtn = document.getElementById("copyProfileBtn");
     const addToHaLink = document.getElementById("addToHaLink");
+    const profilePanel = document.getElementById("profilePanel");
+    const profileInput = document.getElementById("profileInput");
+    const profileFileInput = document.getElementById("profileFileInput");
+    const profileUpload = document.getElementById("profileUpload");
+    const profileOutputRow = document.getElementById("profileOutputRow");
+    const profileOutput = document.getElementById("profileOutput");
+    const copyProfileJsonBtn = document.getElementById("copyProfileJsonBtn");
     const singleInput = document.getElementById("singleInput");
     const singleInputNote = document.getElementById("singleInputNote");
     const singleOutput = document.getElementById("singleOutput");
@@ -514,6 +541,8 @@
     const BROADLINK_TAIL_TICKS = 0x0d05;
     const BROADLINK_PADDING_BYTES = 14;
     const BROADLINK_TAIL_MICROS = Math.ceil(BROADLINK_TAIL_TICKS / BRDLNK_UNIT);
+    const MAX_PROFILE_COMPRESSED_SIZE = 2 * 1024 * 1024;
+    const MAX_PROFILE_DECOMPRESSED_SIZE = 16 * 1024 * 1024;
 
     function setStatus(message) {
       statusEl.textContent = message || "";
@@ -1029,6 +1058,71 @@
       };
     }
 
+    async function readStreamWithLimit(stream, maximumSize) {
+      const reader = stream.getReader();
+      const chunks = [];
+      let totalSize = 0;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        totalSize += value.byteLength;
+        if (totalSize > maximumSize) {
+          await reader.cancel();
+          throw new Error("The decompressed profile is too large.");
+        }
+        chunks.push(value);
+      }
+      const output = new Uint8Array(totalSize);
+      let offset = 0;
+      for (const chunk of chunks) {
+        output.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return output;
+    }
+
+    async function decodeNativeProfileCode(profileCode) {
+      const clean = profileCode.replace(/\s+/g, "");
+      if (!clean.startsWith("IRP1:")) {
+        throw new Error("The profile code must begin with IRP1:.");
+      }
+      const encoded = clean.slice(5);
+      if (
+        !encoded
+        || encoded.length > Math.ceil(MAX_PROFILE_COMPRESSED_SIZE * 4 / 3) + 8
+      ) {
+        throw new Error("The profile code is empty or too large.");
+      }
+      const compressed = base64ToBytes(encoded);
+      if (!compressed.length || compressed.length > MAX_PROFILE_COMPRESSED_SIZE) {
+        throw new Error("The profile code is empty or too large.");
+      }
+      if (typeof DecompressionStream === "undefined") {
+        throw new Error("This browser does not support local profile decompression.");
+      }
+      const decompressedStream = new Blob([compressed])
+        .stream()
+        .pipeThrough(new DecompressionStream("gzip"));
+      const decompressed = await readStreamWithLimit(
+        decompressedStream,
+        MAX_PROFILE_DECOMPRESSED_SIZE,
+      );
+      const profile = JSON.parse(new TextDecoder().decode(decompressed));
+      if (
+        !profile
+        || profile.format !== "smartir-native-profile"
+        || profile.version !== 1
+        || !profile.device
+        || typeof profile.device !== "object"
+        || Array.isArray(profile.device)
+        || !profile.device.commands
+        || typeof profile.device.commands !== "object"
+      ) {
+        throw new Error("The IRP1 profile structure is invalid or unsupported.");
+      }
+      return profile.device;
+    }
+
     function detectSmartIrFormat(data) {
       if (integrationSourceFormat.value !== "auto") {
         return integrationSourceFormat.value;
@@ -1154,6 +1248,10 @@
     }
 
     function updateConvertButtonState() {
+      if (inputMode === "profile") {
+        convertBtn.disabled = !profileInput.value.trim();
+        return;
+      }
       if (inputMode === "integration") {
         convertBtn.disabled = !integrationFileInput.files.length;
         return;
@@ -1207,10 +1305,12 @@
       inputMode = mode;
       const isSingle = mode === "single";
       const isIntegration = mode === "integration";
-      jsonPanel.hidden = isSingle || isIntegration;
+      const isProfile = mode === "profile";
+      jsonPanel.hidden = isSingle || isIntegration || isProfile;
       singlePanel.hidden = !isSingle;
       integrationPanel.hidden = !isIntegration;
-      formatPicker.hidden = isIntegration;
+      profilePanel.hidden = !isProfile;
+      formatPicker.hidden = isIntegration || isProfile;
       integrationFormatPicker.hidden = !isIntegration;
       downloadLink.hidden = true;
       downloadLink.textContent = "Download converted file";
@@ -1220,6 +1320,9 @@
       integrationOutputRow.hidden = true;
       integrationOutput.value = "";
       copyProfileBtn.textContent = "Copy";
+      profileOutputRow.hidden = true;
+      profileOutput.value = "";
+      copyProfileJsonBtn.textContent = "Copy";
       modeTabs.forEach((tab) => {
         const isActive = tab.dataset.inputMode === mode;
         tab.classList.toggle("active", isActive);
@@ -1230,6 +1333,12 @@
         titleEl.textContent = "SmartIR JSON to Native HA Profile";
         subtitleEl.textContent = "Upload a SmartIR climate/fan/light/TV file, create a compact profile code, and add it through the reusable SmartIR Native integration.";
         convertBtn.textContent = "Create profile code";
+        currentMode = null;
+        updateConvertButtonState();
+      } else if (isProfile) {
+        titleEl.textContent = "IRP1 Profile to SmartIR JSON";
+        subtitleEl.textContent = "Paste an IRP1 profile code and extract its complete SmartIR device JSON. The profile stays in your browser.";
+        convertBtn.textContent = "Extract SmartIR JSON";
         currentMode = null;
         updateConvertButtonState();
       } else {
@@ -1260,6 +1369,25 @@
       integrationOutput.value = "";
       copyProfileBtn.textContent = "Copy";
       updateConvertButtonState();
+    });
+
+    async function loadProfileFile(file) {
+      if (!file) return;
+      profileInput.value = (await file.text()).trim();
+      profileOutputRow.hidden = true;
+      profileOutput.value = "";
+      copyProfileJsonBtn.textContent = "Copy";
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+      updateConvertButtonState();
+    }
+
+    profileFileInput.addEventListener("change", () => {
+      loadProfileFile(profileFileInput.files[0]).catch((error) => {
+        console.error(error);
+        setStatus("The IRP1 text file could not be read.");
+      });
     });
 
     ["dragenter", "dragover"].forEach((eventName) => {
@@ -1318,6 +1446,31 @@
       updateConvertButtonState();
     });
 
+    ["dragenter", "dragover"].forEach((eventName) => {
+      profileUpload.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        profileUpload.classList.add("is-dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      profileUpload.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        profileUpload.classList.remove("is-dragover");
+      });
+    });
+
+    profileUpload.addEventListener("drop", (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+      loadProfileFile(file).catch((error) => {
+        console.error(error);
+        setStatus("The IRP1 text file could not be read.");
+      });
+    });
+
     sourceFormatEl.addEventListener("change", () => {
       ensureDifferentFormats("source");
       if (inputMode !== "integration") updateModeFromFormats();
@@ -1353,6 +1506,16 @@
       updateConvertButtonState();
     });
 
+    profileInput.addEventListener("input", () => {
+      profileOutputRow.hidden = true;
+      profileOutput.value = "";
+      copyProfileJsonBtn.textContent = "Copy";
+      downloadLink.hidden = true;
+      downloadLink.href = "#";
+      setStatus("");
+      updateConvertButtonState();
+    });
+
     function parseSingleInput(value) {
       const trimmed = value.trim();
       if (sourceFormatEl.value === "ha") {
@@ -1366,13 +1529,29 @@
     }
 
     convertBtn.addEventListener("click", async () => {
-      if (!currentMode && inputMode !== "integration") return;
+      if (!currentMode && !["integration", "profile"].includes(inputMode)) return;
 
       convertBtn.disabled = true;
-      setStatus(inputMode === "integration" ? "Generating the integration..." : "Converting the file...");
+      setStatus(inputMode === "integration"
+        ? "Generating the integration..."
+        : inputMode === "profile"
+          ? "Extracting the SmartIR JSON..."
+          : "Converting the file...");
 
       try {
-        if (inputMode === "integration") {
+        if (inputMode === "profile") {
+          const device = await decodeNativeProfileCode(profileInput.value);
+          const outputText = JSON.stringify(device, null, 2);
+          profileOutput.value = outputText;
+          profileOutputRow.hidden = false;
+          copyProfileJsonBtn.textContent = "Copy";
+          const blob = new Blob([outputText], { type: "application/json" });
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = "smartir-profile.json";
+          downloadLink.textContent = "Download SmartIR JSON";
+          downloadLink.hidden = false;
+          setStatus(`SmartIR JSON extracted (${detectSmartIrDeviceType(device)}).`);
+        } else if (inputMode === "integration") {
           const file = integrationFileInput.files[0];
           if (!file) return;
           const data = JSON.parse(await file.text());
@@ -1409,7 +1588,9 @@
         }
       } catch (error) {
         console.error(error);
-        if (inputMode === "integration") {
+        if (inputMode === "profile") {
+          setStatus(`The IRP1 code could not be decoded. ${error.message || "Check that the complete code was pasted."}`);
+        } else if (inputMode === "integration") {
           setStatus(`The integration could not be generated. ${error.message || "Check the SmartIR file and its code format."}`);
         } else {
           setStatus(inputMode === "single"
@@ -1460,6 +1641,24 @@
     }
 
     copyProfileBtn.addEventListener("click", copyProfileOutput);
+
+    copyProfileJsonBtn.addEventListener("click", async () => {
+      if (!profileOutput.value) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(profileOutput.value);
+        } else {
+          profileOutput.focus();
+          profileOutput.select();
+          document.execCommand("copy");
+        }
+        copyProfileJsonBtn.textContent = "Copied!";
+        setStatus("SmartIR JSON copied.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Copy failed. Select the SmartIR JSON and copy it manually.");
+      }
+    });
 
     addToHaLink.addEventListener("click", () => {
       if (integrationOutput.value && navigator.clipboard && window.isSecureContext) {

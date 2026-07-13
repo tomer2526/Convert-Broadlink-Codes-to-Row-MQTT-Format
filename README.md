@@ -16,6 +16,8 @@ The converter can process a full SmartIR JSON file or a single pasted IR code.
 
 It can also turn a SmartIR JSON file into a compact `IRP1:` profile code for the reusable SmartIR Native custom integration. Supported device types are climate, fan, light, and TV/media_player. Each profile creates a native Home Assistant entity and sends commands through a Home Assistant Infrared emitter entity. If the configured emitter is unavailable, the entity is marked unavailable too.
 
+The website can also decode an existing `IRP1:` profile back into a downloadable SmartIR JSON file. The extracted commands use Home Assistant signed raw timings and can be converted further to Broadlink or Raw MQTT with the regular JSON converter.
+
 The non-climate platforms follow the official SmartIR JSON layouts:
 
 - Fan speed lists are exposed as Home Assistant percentages, with optional forward/reverse direction and oscillation when those commands exist.
