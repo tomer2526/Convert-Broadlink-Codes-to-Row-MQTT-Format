@@ -32,7 +32,7 @@ from .const import (
     CONF_PROFILE_CODE,
     DOMAIN,
 )
-from .emitter_base import SmartIrNativeEmitterEntity
+from .emitter_base import SmartIrNativeEmitterEntity, carrier_frequency_for_entry
 from .profile import decode_profile_code
 from .receiver import ON_STATE, build_command_states, find_command_state
 
@@ -61,7 +61,10 @@ class SmartIrNativeClimate(SmartIrNativeEmitterEntity, ClimateEntity, RestoreEnt
             CONF_INFRARED_ENTITY_ID,
             entry.data[CONF_INFRARED_ENTITY_ID],
         )
-        super().__init__(infrared_emitter_entity_id)
+        super().__init__(
+            infrared_emitter_entity_id,
+            carrier_frequency_for_entry(entry),
+        )
         self._infrared_receiver_entity_id = entry.options.get(
             CONF_INFRARED_RECEIVER_ENTITY_ID,
             entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),

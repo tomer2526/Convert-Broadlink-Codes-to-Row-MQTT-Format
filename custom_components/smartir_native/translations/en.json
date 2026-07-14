@@ -19,7 +19,11 @@
         "data": {
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
-          "infrared_receiver_entity_id": "Infrared receiver (optional)"
+          "infrared_receiver_entity_id": "Infrared receiver (optional)",
+          "carrier_frequency": "IR carrier frequency"
+        },
+        "data_description": {
+          "carrier_frequency": "The modulation frequency sent to the IR emitter. Leave it at 38 kHz unless the device requires a different carrier frequency."
         }
       },
       "reconfigure": {
@@ -29,10 +33,12 @@
           "name": "Name",
           "infrared_entity_id": "Infrared emitter",
           "infrared_receiver_entity_id": "Infrared receiver (optional)",
+          "carrier_frequency": "IR carrier frequency",
           "profile_code": "IRP1 profile code"
         },
         "data_description": {
-          "profile_code": "Paste a complete IRP1 code for the same type of device."
+          "profile_code": "Paste a complete IRP1 code for the same type of device.",
+          "carrier_frequency": "The modulation frequency sent to the IR emitter. Leave it at 38 kHz unless the device requires a different carrier frequency."
         }
       }
     },
@@ -54,10 +60,12 @@
         "data": {
           "infrared_entity_id": "Infrared emitter",
           "infrared_receiver_entity_id": "Infrared receiver (optional)",
+          "carrier_frequency": "IR carrier frequency",
           "profile_code": "IRP1 profile code"
         },
         "data_description": {
-          "profile_code": "Paste a complete IRP1 code for the same type of device."
+          "profile_code": "Paste a complete IRP1 code for the same type of device.",
+          "carrier_frequency": "The modulation frequency sent to the IR emitter. Leave it at 38 kHz unless the device requires a different carrier frequency."
         }
       }
     },

@@ -20,6 +20,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 
+from .const import CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY
 from .receiver import signals_match, timing_commands
 
 SEQUENCE_COMMAND_DELAY = 0.5
@@ -28,9 +29,9 @@ SEQUENCE_COMMAND_DELAY = 0.5
 class StoredRawCommand(Command):
     """An IR command backed by signed microsecond timings."""
 
-    def __init__(self, timings: list[int]) -> None:
-        """Initialize a 38 kHz raw timing command."""
-        super().__init__(modulation=38000)
+    def __init__(self, timings: list[int], carrier_frequency: int) -> None:
+        """Initialize a raw timing command with its carrier frequency."""
+        super().__init__(modulation=carrier_frequency)
         self._timings = timings
 
     def get_raw_timings(self) -> list[int]:
@@ -57,6 +58,16 @@ def find_command_value(node: Any, *aliases: str) -> Any:
     return None
 
 
+def carrier_frequency_for_entry(entry: Any) -> int:
+    """Return the saved carrier frequency, preserving old entry defaults."""
+    return int(
+        entry.options.get(
+            CONF_CARRIER_FREQUENCY,
+            entry.data.get(CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY),
+        )
+    )
+
+
 class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
     """Base emitter consumer with common availability and send helpers."""
 
@@ -65,9 +76,14 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
     _attr_name = None
     _attr_should_poll = False
 
-    def __init__(self, infrared_emitter_entity_id: str) -> None:
+    def __init__(
+        self,
+        infrared_emitter_entity_id: str,
+        carrier_frequency: int = DEFAULT_CARRIER_FREQUENCY,
+    ) -> None:
         """Initialize emitter state tracking."""
         self._infrared_emitter_entity_id = infrared_emitter_entity_id
+        self._carrier_frequency = carrier_frequency
         self._emitter_available = True
 
     async def async_added_to_hass(self) -> None:
@@ -120,7 +136,9 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
         else:
             raise HomeAssistantError("Profile command payload is invalid")
         for index, timings in enumerate(commands):
-            await self._send_command(StoredRawCommand(timings))
+            await self._send_command(
+                StoredRawCommand(timings, self._carrier_frequency)
+            )
             if index + 1 < len(commands):
                 await asyncio.sleep(SEQUENCE_COMMAND_DELAY)
 
@@ -132,9 +150,10 @@ class SmartIrNativeReceiverEntity(SmartIrNativeEmitterEntity):
         self,
         infrared_emitter_entity_id: str,
         infrared_receiver_entity_id: str | None,
+        carrier_frequency: int = DEFAULT_CARRIER_FREQUENCY,
     ) -> None:
         """Initialize optional receiver tracking."""
-        super().__init__(infrared_emitter_entity_id)
+        super().__init__(infrared_emitter_entity_id, carrier_frequency)
         self._infrared_receiver_entity_id = infrared_receiver_entity_id
         self._remove_receiver_subscription: CALLBACK_TYPE | None = None
         self._receiver_command_timings: dict[str, list[tuple[int, ...]]] = {}

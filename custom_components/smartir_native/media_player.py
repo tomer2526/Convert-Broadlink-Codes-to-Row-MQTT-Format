@@ -25,7 +25,11 @@ from .const import (
     CONF_PROFILE_CODE,
     DOMAIN,
 )
-from .emitter_base import SmartIrNativeReceiverEntity, find_command_value
+from .emitter_base import (
+    SmartIrNativeReceiverEntity,
+    carrier_frequency_for_entry,
+    find_command_value,
+)
 from .profile import decode_profile_code
 
 
@@ -57,6 +61,7 @@ class SmartIrNativeMediaPlayer(
                 CONF_INFRARED_RECEIVER_ENTITY_ID,
                 entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
             ),
+            carrier_frequency_for_entry(entry),
         )
         self._commands = data["commands"]
         self._sources = find_command_value(self._commands, "sources")
