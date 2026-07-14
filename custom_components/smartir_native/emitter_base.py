@@ -1,6 +1,7 @@
 """Shared emitter helpers for SmartIR Native entities."""
 
 import asyncio
+import logging
 from typing import Any
 
 from infrared_protocols.commands import Command
@@ -24,6 +25,8 @@ from .const import CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY
 from .receiver import signals_match, timing_commands
 
 SEQUENCE_COMMAND_DELAY = 0.5
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class StoredRawCommand(Command):
@@ -136,6 +139,12 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
         else:
             raise HomeAssistantError("Profile command payload is invalid")
         for index, timings in enumerate(commands):
+            _LOGGER.debug(
+                "Sending raw IR signal with %d timings at %d Hz: %s",
+                len(timings),
+                self._carrier_frequency,
+                timings,
+            )
             await self._send_command(
                 StoredRawCommand(timings, self._carrier_frequency)
             )
@@ -227,8 +236,20 @@ class SmartIrNativeReceiverEntity(SmartIrNativeEmitterEntity):
     @callback
     def _handle_received_signal(self, signal: InfraredReceivedSignal) -> None:
         """Apply state updates when a known receiver command is observed."""
+        _LOGGER.debug(
+            "Received raw IR signal with %d timings%s: %s",
+            len(signal.timings),
+            (
+                f" at {signal.modulation} Hz"
+                if signal.modulation is not None
+                else ""
+            ),
+            signal.timings,
+        )
         if (key := self._match_received_command_key(signal.timings)) is None:
+            _LOGGER.debug("Received IR signal did not match this SmartIR profile")
             return
+        _LOGGER.debug("Received IR signal matched profile command %s", key)
         if self._handle_matched_receiver_command(key):
             self.async_write_ha_state()
 

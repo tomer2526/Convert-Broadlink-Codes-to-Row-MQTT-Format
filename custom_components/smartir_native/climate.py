@@ -179,6 +179,16 @@ class SmartIrNativeClimate(SmartIrNativeEmitterEntity, ClimateEntity, RestoreEnt
     @callback
     def _handle_received_signal(self, signal: InfraredReceivedSignal) -> None:
         """Update assumed climate state when a known remote command is received."""
+        _LOGGER.debug(
+            "Received raw IR signal with %d timings%s: %s",
+            len(signal.timings),
+            (
+                f" at {signal.modulation} Hz"
+                if signal.modulation is not None
+                else ""
+            ),
+            signal.timings,
+        )
         matched = find_command_state(
             signal.timings,
             self._received_command_states,
@@ -188,7 +198,9 @@ class SmartIrNativeClimate(SmartIrNativeEmitterEntity, ClimateEntity, RestoreEnt
             current_temperature=self._attr_target_temperature,
         )
         if matched is None:
+            _LOGGER.debug("Received IR signal did not match this SmartIR profile")
             return
+        _LOGGER.debug("Received IR signal matched a SmartIR climate command")
 
         if matched.hvac_mode == HVACMode.OFF.value:
             if self._attr_hvac_mode != HVACMode.OFF:
