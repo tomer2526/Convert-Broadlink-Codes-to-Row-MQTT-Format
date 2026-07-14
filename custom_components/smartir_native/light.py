@@ -27,6 +27,7 @@ from .emitter_base import (
     SmartIrNativeReceiverEntity,
     carrier_frequency_for_entry,
     find_command_value,
+    timing_scale_for_entry,
 )
 from .profile import decode_profile_code
 from .receiver import timing_commands
@@ -61,6 +62,7 @@ class SmartIrNativeLight(SmartIrNativeReceiverEntity, LightEntity, RestoreEntity
                 entry.data.get(CONF_INFRARED_RECEIVER_ENTITY_ID),
             ),
             carrier_frequency_for_entry(entry),
+            timing_scale_for_entry(entry),
         )
         self._commands = data["commands"]
         self._brightness_levels = [int(level) for level in data.get("brightness", [])]

@@ -33,10 +33,14 @@ from .const import (
     CONF_INFRARED_RECEIVER_ENTITY_ID,
     CONF_NAME,
     CONF_PROFILE_CODE,
+    CONF_TIMING_SCALE,
     DEFAULT_CARRIER_FREQUENCY,
+    DEFAULT_TIMING_SCALE,
     DOMAIN,
     MAX_CARRIER_FREQUENCY,
+    MAX_TIMING_SCALE,
     MIN_CARRIER_FREQUENCY,
+    MIN_TIMING_SCALE,
 )
 from .profile import (
     InvalidProfile,
@@ -55,6 +59,7 @@ def _device_schema(
     emitter: str | None = None,
     receiver: str | None = None,
     carrier_frequency: int = DEFAULT_CARRIER_FREQUENCY,
+    timing_scale: int = DEFAULT_TIMING_SCALE,
     profile_code: str | None = None,
 ) -> vol.Schema:
     """Build the shared device form for setup and reconfiguration."""
@@ -77,6 +82,10 @@ def _device_schema(
             CONF_CARRIER_FREQUENCY,
             default=carrier_frequency,
         ): _carrier_frequency_selector(),
+        vol.Required(
+            CONF_TIMING_SCALE,
+            default=timing_scale,
+        ): _timing_scale_selector(),
     }
     if include_receiver:
         receiver_marker = (
@@ -116,6 +125,19 @@ def _carrier_frequency_selector() -> NumberSelector:
             step=1_000,
             mode=NumberSelectorMode.BOX,
             unit_of_measurement="Hz",
+        )
+    )
+
+
+def _timing_scale_selector() -> NumberSelector:
+    """Build the output timing-scale control in percent."""
+    return NumberSelector(
+        NumberSelectorConfig(
+            min=MIN_TIMING_SCALE,
+            max=MAX_TIMING_SCALE,
+            step=1,
+            mode=NumberSelectorMode.BOX,
+            unit_of_measurement="%",
         )
     )
 
@@ -206,6 +228,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_NAME: user_input[CONF_NAME],
                 CONF_INFRARED_ENTITY_ID: user_input[CONF_INFRARED_ENTITY_ID],
                 CONF_CARRIER_FREQUENCY: int(user_input[CONF_CARRIER_FREQUENCY]),
+                CONF_TIMING_SCALE: int(user_input[CONF_TIMING_SCALE]),
                 CONF_PROFILE_CODE: self._profile_code,
             }
             if receiver := user_input.get(CONF_INFRARED_RECEIVER_ENTITY_ID):
@@ -243,6 +266,12 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 entry.data.get(CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY),
             )
         )
+        current_timing_scale = int(
+            entry.options.get(
+                CONF_TIMING_SCALE,
+                entry.data.get(CONF_TIMING_SCALE, DEFAULT_TIMING_SCALE),
+            )
+        )
         errors: dict[str, str] = {}
         if user_input is not None:
             profile_code, profile_error = _normalize_updated_profile(
@@ -260,6 +289,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_CARRIER_FREQUENCY: int(
                         user_input[CONF_CARRIER_FREQUENCY]
                     ),
+                    CONF_TIMING_SCALE: int(user_input[CONF_TIMING_SCALE]),
                     CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                         CONF_INFRARED_RECEIVER_ENTITY_ID
                     ),
@@ -271,6 +301,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_CARRIER_FREQUENCY: int(
                         user_input[CONF_CARRIER_FREQUENCY]
                     ),
+                    CONF_TIMING_SCALE: int(user_input[CONF_TIMING_SCALE]),
                     CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                         CONF_INFRARED_RECEIVER_ENTITY_ID
                     ),
@@ -291,6 +322,7 @@ class SmartIrNativeConfigFlow(ConfigFlow, domain=DOMAIN):
                 emitter=current_emitter,
                 receiver=current_receiver,
                 carrier_frequency=current_carrier_frequency,
+                timing_scale=current_timing_scale,
                 profile_code=(
                     user_input[CONF_PROFILE_CODE]
                     if user_input is not None
@@ -324,6 +356,12 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
                 entry.data.get(CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY),
             )
         )
+        current_timing_scale = int(
+            entry.options.get(
+                CONF_TIMING_SCALE,
+                entry.data.get(CONF_TIMING_SCALE, DEFAULT_TIMING_SCALE),
+            )
+        )
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -347,6 +385,7 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
                     CONF_CARRIER_FREQUENCY: int(
                         user_input[CONF_CARRIER_FREQUENCY]
                     ),
+                    CONF_TIMING_SCALE: int(user_input[CONF_TIMING_SCALE]),
                     CONF_INFRARED_RECEIVER_ENTITY_ID: user_input.get(
                         CONF_INFRARED_RECEIVER_ENTITY_ID
                     ),
@@ -378,6 +417,12 @@ class SmartIrNativeOptionsFlow(OptionsFlowWithReload):
                 default=current_carrier_frequency,
             )
         ] = _carrier_frequency_selector()
+        schema_fields[
+            vol.Required(
+                CONF_TIMING_SCALE,
+                default=current_timing_scale,
+            )
+        ] = _timing_scale_selector()
         receiver_marker = (
             vol.Optional(
                 CONF_INFRARED_RECEIVER_ENTITY_ID,

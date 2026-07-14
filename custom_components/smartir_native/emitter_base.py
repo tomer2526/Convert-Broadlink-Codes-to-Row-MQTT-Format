@@ -21,7 +21,12 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import CONF_CARRIER_FREQUENCY, DEFAULT_CARRIER_FREQUENCY
+from .const import (
+    CONF_CARRIER_FREQUENCY,
+    CONF_TIMING_SCALE,
+    DEFAULT_CARRIER_FREQUENCY,
+    DEFAULT_TIMING_SCALE,
+)
 from .receiver import signals_match, timing_commands
 
 SEQUENCE_COMMAND_DELAY = 0.5
@@ -71,6 +76,16 @@ def carrier_frequency_for_entry(entry: Any) -> int:
     )
 
 
+def timing_scale_for_entry(entry: Any) -> int:
+    """Return the per-entry timing scale percentage."""
+    return int(
+        entry.options.get(
+            CONF_TIMING_SCALE,
+            entry.data.get(CONF_TIMING_SCALE, DEFAULT_TIMING_SCALE),
+        )
+    )
+
+
 class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
     """Base emitter consumer with common availability and send helpers."""
 
@@ -83,10 +98,12 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
         self,
         infrared_emitter_entity_id: str,
         carrier_frequency: int = DEFAULT_CARRIER_FREQUENCY,
+        timing_scale: int = DEFAULT_TIMING_SCALE,
     ) -> None:
         """Initialize emitter state tracking."""
         self._infrared_emitter_entity_id = infrared_emitter_entity_id
         self._carrier_frequency = carrier_frequency
+        self._timing_scale = timing_scale
         self._emitter_available = True
 
     async def async_added_to_hass(self) -> None:
@@ -139,14 +156,18 @@ class SmartIrNativeEmitterEntity(InfraredEmitterConsumerEntity):
         else:
             raise HomeAssistantError("Profile command payload is invalid")
         for index, timings in enumerate(commands):
+            transmit_timings = [
+                round(timing * self._timing_scale / 100) for timing in timings
+            ]
             _LOGGER.debug(
-                "Sending raw IR signal with %d timings at %d Hz: %s",
-                len(timings),
+                "Sending raw IR signal with %d timings at %d Hz and %d%% scale: %s",
+                len(transmit_timings),
                 self._carrier_frequency,
-                timings,
+                self._timing_scale,
+                transmit_timings,
             )
             await self._send_command(
-                StoredRawCommand(timings, self._carrier_frequency)
+                StoredRawCommand(transmit_timings, self._carrier_frequency)
             )
             if index + 1 < len(commands):
                 await asyncio.sleep(SEQUENCE_COMMAND_DELAY)
@@ -160,9 +181,14 @@ class SmartIrNativeReceiverEntity(SmartIrNativeEmitterEntity):
         infrared_emitter_entity_id: str,
         infrared_receiver_entity_id: str | None,
         carrier_frequency: int = DEFAULT_CARRIER_FREQUENCY,
+        timing_scale: int = DEFAULT_TIMING_SCALE,
     ) -> None:
         """Initialize optional receiver tracking."""
-        super().__init__(infrared_emitter_entity_id, carrier_frequency)
+        super().__init__(
+            infrared_emitter_entity_id,
+            carrier_frequency,
+            timing_scale,
+        )
         self._infrared_receiver_entity_id = infrared_receiver_entity_id
         self._remove_receiver_subscription: CALLBACK_TYPE | None = None
         self._receiver_command_timings: dict[str, list[tuple[int, ...]]] = {}
